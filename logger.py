@@ -1,8 +1,17 @@
 import logging
+import sys
 
-logging.basicConfig(
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
-    level=logging.INFO,
+# Настройки логгера
+logger = logging.getLogger("telegram_openai_bot")
+logger.setLevel(logging.INFO)
+
+# Формат логов
+formatter = logging.Formatter(
+    "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
-logger = logging.getLogger(__name__)
+# Лог только в консоль
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
