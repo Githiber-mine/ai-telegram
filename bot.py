@@ -1,4 +1,4 @@
-import logging
+from logger import logger
 import os
 import random
 from typing import Dict
