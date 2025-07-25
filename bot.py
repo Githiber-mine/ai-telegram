@@ -53,10 +53,13 @@ async def ask_openai(prompt: str) -> str:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
+        logger.debug("Пустое сообщение или отсутствует текст — игнор.")
         return
 
     text = message.text
     chat_id = update.effective_chat.id
+    user = update.effective_user.username or update.effective_user.id
+    logger.info(f"📩 Сообщение от @{user}: {text}")
 
     # 🔍 Получаем настройки для чата (по умолчанию — True)
     random_enabled = random_mode_per_chat.get(chat_id, True)
@@ -73,9 +76,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if mentioned or is_reply:
         should_reply = True
+        logger.info("🔁 Ответ из-за упоминания или реплая.")
     elif random_enabled and random.random() < 0.2:
         should_reply = True
         random_triggered = True
+        logger.info("🎲 Ответ сработал по случайному триггеру (20%).")
 
     if should_reply:
         prompt = text.replace(BOT_USERNAME, "").strip()
@@ -83,11 +88,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not prompt:
             if not random_triggered:
                 await message.reply_text("Пожалуйста, задайте вопрос.")
+                logger.info("❗ Получено только упоминание, без текста.")
             return
 
-        response = await ask_openai(prompt)
-        await message.reply_text(response)
-
+        try:
+            logger.info(f"➡️ Отправляем в OpenAI: {prompt}")
+            response = await ask_openai(prompt)
+            await message.reply_text(response)
+            logger.info("✅ Ответ отправлен пользователю.")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при запросе к OpenAI: {e}")
+            await message.reply_text("Произошла ошибка при обращении к GPT.")
 
 
 # ▶️ Обработчик команды /start
@@ -105,7 +116,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📜 Посмотреть условия использования: `/terms`\n\n"
         "Готов помочь — спрашивай!"
     )
-
+    logger.info("Команда /start получена")
     await update.message.reply_text(message, parse_mode="Markdown")
 
 
@@ -174,5 +185,6 @@ async def main():
 
 # ✅ Точка входа
 if __name__ == "__main__":
+    logger.info("Бот запускается...")
     import asyncio
     asyncio.run(main())
