@@ -220,13 +220,15 @@ async def main():
 # Точка входа
 if __name__ == "__main__":
     logger.info("Бот запускается...")
+
     try:
-        asyncio.run(main())
-    except RuntimeError as e:
-        # На Render уже может быть запущен event loop → запускаем задачу напрямую
-        if "event loop is running" in str(e):
-            loop = asyncio.get_event_loop()
-            loop.create_task(main())
-            loop.run_forever()
-        else:
-            raise
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    try:
+        loop.create_task(main())
+        loop.run_forever()
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("Бот остановлен пользователем.")
