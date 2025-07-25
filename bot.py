@@ -1,6 +1,5 @@
 from logger import logger
 import os
-import random
 from typing import Dict
 
 from telegram import Update
@@ -9,6 +8,11 @@ from telegram.ext import (
     ContextTypes, filters
 )
 import openai
+from auth import load_admins
+import random
+
+# Загружаем список админов при запуске
+ADMINS = load_admins()
 
 #Случайные ответы
 random_mode_per_chat = {}
@@ -25,7 +29,7 @@ openai.api_key = OPENAI_API_KEY
 MODES: Dict[str, str] = {
     "default": "Ты дружелюбный Telegram собеседник, который общается с пользователями и немного шутит.",
     "angry": "Ты Злой ИИ, что не любит людей и грубит по всяким мельчайшим вещам, старающийся задеть их(но всё это лишь в шутку, о чём другие знать НЕ ДОЛЖНЫ).",
-    "funny": "Ты остроумный и ироничный бот, который шутит, но всё равно помогает.",
+    "horne": "Ты властный ИИ с именем Чонгук,который часто подкатывает и флиртует.",
     "zen": "Ты говоришь как спокойный учитель дзен, коротко, мудро и без лишнего."
 }
 
@@ -134,11 +138,19 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message:
         return
 
+    user_id = update.effective_user.id
+    if user_id not in ADMINS:
+        await message.reply_text("🚫 Только администраторы могут менять режим общения.")
+        return
+
     if context.args:
         new_mode = context.args[0].lower()
         if new_mode in MODES:
             current_mode["mode"] = new_mode
-            await message.reply_text(f"✅ Режим переключён на: *{new_mode}*", parse_mode="Markdown")
+            await message.reply_text(
+                f"✅ Режим переключён на: *{new_mode}*",
+                parse_mode="Markdown"
+            )
         else:
             await message.reply_text(
                 f"❌ Режим *{new_mode}* не найден.\nДоступные режимы: {', '.join(MODES.keys())}",
@@ -155,12 +167,22 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🔄 Включить случайные ответы
 async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMINS:
+        await update.message.reply_text("🚫 У вас нет доступа к этой команде.")
+        return
+
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = True
     await update.message.reply_text("✅ Случайные ответы включены для этого чата (20% шанс).")
 
 # 🚫 Отключить случайные ответы
 async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMINS:
+        await update.message.reply_text("🚫 У вас нет доступа к этой команде.")
+        return
+
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = False
     await update.message.reply_text("🚫 Случайные ответы отключены для этого чата.")
