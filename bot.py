@@ -200,6 +200,8 @@ async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode="Markdown")
 
 #запуск бота
+import asyncio
+
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -213,10 +215,18 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
     logger.info("Бот запущен...")
-    await app.run_polling()  # Эта строка запускает инициализацию, start и idle в одном вызове
+    await app.run_polling()
 
-#точка входа
+# Точка входа
 if __name__ == "__main__":
-    import asyncio
     logger.info("Бот запускается...")
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except RuntimeError as e:
+        # На Render уже может быть запущен event loop → запускаем задачу напрямую
+        if "event loop is running" in str(e):
+            loop = asyncio.get_event_loop()
+            loop.create_task(main())
+            loop.run_forever()
+        else:
+            raise
