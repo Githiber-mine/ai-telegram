@@ -202,7 +202,6 @@ async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # 🚀 Запуск бота
 async def main():
-    logging.basicConfig(level=logging.INFO)
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
     # Обработчики
