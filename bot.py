@@ -200,7 +200,6 @@ async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message, parse_mode="Markdown")
 
 #запуск бота
-# запуск бота
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -217,13 +216,20 @@ async def main():
     await app.run_polling()
 
 
-# Точка входа
+# 🔧 Точка входа
 if __name__ == "__main__":
     import asyncio
 
     logger.info("Бот запускается...")
 
     try:
-        asyncio.run(main())
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # Для окружений с уже активным event loop (например, Railway)
+            import nest_asyncio
+            nest_asyncio.apply()
+            loop.create_task(main())
+        else:
+            loop.run_until_complete(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Бот остановлен.")
