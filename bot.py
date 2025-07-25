@@ -199,8 +199,7 @@ async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = "*🎉 Поздравляем!*\n\n*Вы нашли секретную команду!* \n JDH ЛЕГЕНДА🤫"
     await update.message.reply_text(message, parse_mode="Markdown")
 
-
-# 🚀 Запуск бота
+#запуск бота
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
@@ -213,21 +212,11 @@ async def main():
     app.add_handler(CommandHandler("JDH", secret_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
-    print("Бот запущен...")
-   
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling()
-    await app.stop()
+    logger.info("Бот запущен...")
+    await app.run_polling()  # Эта строка запускает инициализацию, start и idle в одном вызове
 
-
-# ✅ Точка входа
+#точка входа
 if __name__ == "__main__":
     import asyncio
-
     logger.info("Бот запускается...")
-    try:
-        asyncio.get_event_loop().run_until_complete(main())
-    except RuntimeError:
-        # Если цикл уже запущен (например, на Render) — запускаем main как таск
-        asyncio.ensure_future(main())
+    asyncio.run(main())
