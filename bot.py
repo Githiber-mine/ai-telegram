@@ -219,6 +219,11 @@ async def main():
 
 # ✅ Точка входа
 if __name__ == "__main__":
-    logger.info("Бот запускается...")
     import asyncio
-    asyncio.run(main())
+
+    logger.info("Бот запускается...")
+    try:
+        asyncio.get_event_loop().run_until_complete(main())
+    except RuntimeError:
+        # Если цикл уже запущен (например, на Render) — запускаем main как таск
+        asyncio.ensure_future(main())
