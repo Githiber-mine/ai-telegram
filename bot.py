@@ -34,7 +34,7 @@ MODES: Dict[str, str] = {
 }
 
 #Текущий режим (на время работы)
-current_mode = {"mode": "default"}
+current_mode_per_chat = {}
 
 
 #Запрос в OpenAI с учётом выбранного режима
@@ -138,27 +138,33 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not message:
         return
 
+    chat_id = update.effective_chat.id
     user_id = update.effective_user.id
-    if user_id not in ADMINS:
-        await message.reply_text("🚫 Только администраторы могут менять режим общения.")
-        return
 
+    # Проверка на администратора — только для смены
     if context.args:
+        if user_id not in ADMINS:
+            await message.reply_text("🚫 Только администраторы могут менять режим общения.")
+            return
+
         new_mode = context.args[0].lower()
         if new_mode in MODES:
-            current_mode["mode"] = new_mode
+            current_mode_per_chat[chat_id] = new_mode
             await message.reply_text(
-                f"✅ Режим переключён на: *{new_mode}*",
+                f"✅ Режим для этого чата установлен на: *{new_mode}*",
                 parse_mode="Markdown"
             )
         else:
             await message.reply_text(
-                f"❌ Режим *{new_mode}* не найден.\nДоступные режимы: {', '.join(MODES.keys())}",
+                f"❌ Режим *{new_mode}* не найден.\n"
+                f"Доступные: `{', '.join(MODES.keys())}`",
                 parse_mode="Markdown"
             )
     else:
+        # Отображение текущего режима
+        current = current_mode_per_chat.get(chat_id, "default")
         await message.reply_text(
-            f"🧠 Текущий режим: *{current_mode['mode']}*\n"
+            f"🧠 Текущий режим для этого чата: *{current}*\n"
             f"Доступные: `{', '.join(MODES.keys())}`\n\n"
             f"Чтобы изменить: `/mode funny`",
             parse_mode="Markdown"
