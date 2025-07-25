@@ -166,6 +166,12 @@ async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🚫 Случайные ответы отключены для этого чата.")
 
 
+# 🕵️‍♂️ Секретная команда
+async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = "*🎉 Поздравляем!*\n\n*Вы нашли секретную команду!* \n JDH ЛЕГЕНДА🤫"
+    await update.message.reply_text(message, parse_mode="Markdown")
+
+
 # 🚀 Запуск бота
 async def main():
     logging.basicConfig(level=logging.INFO)
@@ -177,6 +183,7 @@ async def main():
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("randomOn", enable_random))
     app.add_handler(CommandHandler("randomOff", disable_random))
+    app.add_handler(CommandHandler("JDH", secret_command))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
     print("Бот запущен...")
