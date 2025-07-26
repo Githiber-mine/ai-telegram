@@ -96,20 +96,24 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
         logger.warning(f"⚠️ Неизвестный режим: {mode}. Используем default.")
         system_prompt = MODES["default"]
 
-    base_model = "istralai/Mixtral-8x7B-Instruct-v0.1"  # Используется для подсчета токенов, можно указать "mixtral"
-    max_prompt_tokens = 3000  # Чтобы оставить запас на ответ (1024)
+    base_model = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    max_prompt_tokens = 3000  # Чтобы оставить запас на ответ (до 1024)
 
-    # Стартуем с системного сообщения
-    messages = [{"role": "system", "content": system_prompt}]
-
+    # Получаем и валидируем историю
     history = chat_history.get(chat_id, [])
     valid_history = [msg for msg in history if is_valid_message(msg)]
 
-    # Постепенно добавляем историю до достижения лимита
+    # Если есть хотя бы одно сообщение от user — вставим system_prompt внутрь
+    if valid_history and valid_history[-1]["role"] == "user":
+        valid_history[-1]["content"] = f"{system_prompt}\n\n{valid_history[-1]['content']}"
+
+    # Начинаем собирать сообщения
+    messages = []
+
     for msg in reversed(valid_history):
-        messages.insert(1, msg)  # добавляем после system
+        messages.insert(0, msg)  # вставляем в начало
         if count_tokens(messages, model=base_model) > max_prompt_tokens:
-            messages.pop(1)  # удаляем последнее вставленное
+            messages.pop(0)  # удаляем последнее добавленное (вверх)
             break
 
     logger.debug(f"📚 Отправляемые сообщения в Together ({len(messages)}):\n{json.dumps(messages, ensure_ascii=False, indent=2)}")
