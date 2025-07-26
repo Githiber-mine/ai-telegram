@@ -97,7 +97,7 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
             messages=messages,
             temperature=0.7,
             top_p=0.95,
-            max_tokens=512,
+            max_tokens=1024,
             timeout=20
         )
         raw = response.choices[0].message.content.strip()
