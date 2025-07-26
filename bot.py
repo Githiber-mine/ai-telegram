@@ -36,19 +36,14 @@ import asyncio
 ADMINS = load_admins()
 
 #загрузка настроек мода и рандома
-settings = load_chat_settings()
-random_mode_per_chat = settings.get("random", {})
-current_mode_per_chat = settings.get("modes", {})
-
+chat_settings = load_chat_settings()
+random_mode_per_chat = chat_settings.setdefault("random", {})
+current_mode_per_chat = chat_settings.setdefault("modes", {})
 
 #сохранение настроек в json
 def save_chat_settings():
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump({
-            "modes": current_mode_per_chat,
-            "random": random_mode_per_chat
-        }, f, indent=2, ensure_ascii=False)
-
+        json.dump(chat_settings, f, indent=2, ensure_ascii=False)
 
 
 #Получение ключей из переменных окружения
@@ -69,15 +64,32 @@ MODES: Dict[str, str] = {
 chat_history: Dict[int, list] = {}
 MAX_HISTORY = 6
 
-# Запрос в Together AI с учётом режима
+# Валидация одного сообщения
+def is_valid_message(msg: dict) -> bool:
+    return (
+        isinstance(msg, dict)
+        and msg.get("role") in {"system", "user", "assistant"}
+        and isinstance(msg.get("content"), str)
+        and msg.get("content").strip() != ""
+    )
+
+# Асинхронный запрос с валидацией
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
     system_prompt = MODES.get(mode)
     if not system_prompt:
         logger.warning(f"⚠️ Неизвестный режим: {mode}. Используем default.")
         system_prompt = MODES["default"]
 
+    # Стартуем с системного сообщения
     messages = [{"role": "system", "content": system_prompt}]
-    messages += chat_history.get(chat_id, [])
+
+    # Забираем историю и валидируем
+    history = chat_history.get(chat_id, [])
+    valid_history = [msg for msg in history if is_valid_message(msg)]
+    messages += valid_history
+
+    # Debug: показываем, что именно отправляем
+    logger.debug(f"📚 Отправляемые сообщения в Together ({len(messages)}):\n{json.dumps(messages, ensure_ascii=False, indent=2)}")
 
     try:
         response = client.chat.completions.create(
@@ -91,8 +103,8 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
         raw = response.choices[0].message.content.strip()
         return raw
     except Exception as e:
+        logger.error(f"❌ Ошибка при обращении к Together: {e}")
         return f"❌ Ошибка от Together: {str(e)}"
-
 
 #Обработка входящего сообщения
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -142,7 +154,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ✏️ Обновление истории чата
         if chat_id not in chat_history:
             chat_history[chat_id] = []
-
+        logger.debug(f"Добавляется в историю: role=user, content={repr(prompt)}")
         chat_history[chat_id].append({"role": "user", "content": prompt})
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
