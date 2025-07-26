@@ -78,16 +78,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message.reply_to_message.from_user.username == context.bot.username
     )
 
+    # 🧠 Ранняя проверка — если бот не упомянут, не в ответе и рандом отключён — выходим
+    if not (mentioned or is_reply or random_enabled):
+        logger.debug("⏩ Сообщение проигнорировано (нет упоминания, не реплай и рандом выкл).")
+        return
+
     should_reply = False
     random_triggered = False
 
     if mentioned or is_reply:
         should_reply = True
         logger.info("🔁 Ответ из-за упоминания или реплая.")
-    elif random_enabled and random.random() < 0.2:
+    elif random_enabled and random.random() < 0.1:
         should_reply = True
         random_triggered = True
-        logger.info("🎲 Ответ сработал по случайному триггеру (20%).")
+        logger.info("🎲 Ответ сработал по случайному триггеру (10%).")
 
     if should_reply:
         prompt = text.replace(BOT_USERNAME, "").strip()
@@ -107,6 +112,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"❌ Ошибка при запросе к OpenAI: {e}")
             await message.reply_text("Произошла ошибка при обращении к GPT.")
+
 
 
 # ▶️ Обработчик команды /start
