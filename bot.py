@@ -13,13 +13,6 @@ def load_chat_settings():
             return json.load(f)
     return {}
 
-def save_chat_settings():
-    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump({
-            "modes": current_mode_per_chat,
-            "random": random_mode_per_chat
-        }, f, indent=2, ensure_ascii=False)
-
 
 #импорт ТГ и ИИ
 from telegram import Update
@@ -48,6 +41,15 @@ random_mode_per_chat = settings.get("random", {})
 current_mode_per_chat = settings.get("modes", {})
 
 
+#сохранение настроек в json
+def save_chat_settings():
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump({
+            "modes": current_mode_per_chat,
+            "random": random_mode_per_chat
+        }, f, indent=2, ensure_ascii=False)
+
+
 
 #Получение ключей из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
@@ -65,11 +67,15 @@ MODES: Dict[str, str] = {
 
 # История сообщений для каждого чата (max 10 сообщений)
 chat_history: Dict[int, list] = {}
-MAX_HISTORY = 10
+MAX_HISTORY = 6
 
 # Запрос в Together AI с учётом режима
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
-    system_prompt = MODES.get(mode, MODES["default"])
+    system_prompt = MODES.get(mode)
+    if not system_prompt:
+        logger.warning(f"⚠️ Неизвестный режим: {mode}. Используем default.")
+        system_prompt = MODES["default"]
+
     messages = [{"role": "system", "content": system_prompt}]
     messages += chat_history.get(chat_id, [])
 
@@ -150,6 +156,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             logger.info(f"➡️ Отправляем в Together: {prompt}")
             mode = current_mode_per_chat.get(chat_id, "default")
+            logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
             reply = await ask_openai(chat_id, mode=mode)
 
             # Добавляем ответ в историю
