@@ -8,7 +8,10 @@ from telegram.ext import (
     ContextTypes, filters
 )
 import openai
-client = openai.OpenAI()
+client = openai.OpenAI(
+    api_key=os.getenv("TOGETHER_API_KEY"),
+    base_url="https://api.together.xyz/v1"
+)
 
 from auth import load_admins
 import random
@@ -23,10 +26,9 @@ random_mode_per_chat = {}
 
 #Получение ключей из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "@userbot")
 
-openai.api_key = OPENAI_API_KEY
 
 #Характеры бота (моды)
 MODES: Dict[str, str] = {
@@ -45,7 +47,7 @@ async def ask_openai(prompt: str, mode: str = "default") -> str:
     system_prompt = MODES.get(mode, MODES["default"])
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="mistralai/Mistral-7B-Instruct-v0.1",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
