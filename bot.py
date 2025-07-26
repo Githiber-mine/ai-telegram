@@ -39,8 +39,8 @@ current_mode_per_chat = {}
 
 
 #Запрос в OpenAI с учётом выбранного режима
-async def ask_openai(prompt: str) -> str:
-    system_prompt = MODES.get(current_mode["mode"], MODES["default"])
+async def ask_openai(prompt: str, mode: str = "default") -> str:
+    system_prompt = MODES.get(mode, MODES["default"])
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -52,7 +52,6 @@ async def ask_openai(prompt: str) -> str:
         return response["choices"][0]["message"]["content"].strip()
     except Exception as e:
         return f"Произошла ошибка при запросе к ИИ: {str(e)}"
-
 
 #Ответы на упоминания и ответы
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
