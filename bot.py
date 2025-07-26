@@ -218,18 +218,11 @@ async def main():
 
 # 🔧 Точка входа
 if __name__ == "__main__":
-    import asyncio
-
     logger.info("Бот запускается...")
 
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Для окружений с уже активным event loop (например, Railway)
-            import nest_asyncio
-            nest_asyncio.apply()
-            loop.create_task(main())
-        else:
-            loop.run_until_complete(main())
+        import nest_asyncio
+        nest_asyncio.apply()
+        asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Бот остановлен.")
