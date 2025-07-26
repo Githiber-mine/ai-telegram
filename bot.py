@@ -75,7 +75,7 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
 
     try:
         response = client.chat.completions.create(
-            model="openchat/openchat-3.5-1210",
+            model="mistralai/Mixtral-8x7B-Instruct-v0.1",
             messages=messages,
             temperature=0.7,
             top_p=0.95,
@@ -264,6 +264,9 @@ async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #запуск бота
 async def main():
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+     # Очистка старых апдейтов
+    await app.bot.delete_webhook(drop_pending_updates=True)
 
     # Обработчики
     app.add_handler(CommandHandler("terms", terms_command))
