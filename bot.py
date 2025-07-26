@@ -8,6 +8,8 @@ from telegram.ext import (
     ContextTypes, filters
 )
 import openai
+client = openai.OpenAI()
+
 from auth import load_admins
 import random
 import asyncio
@@ -42,13 +44,17 @@ current_mode_per_chat = {}
 async def ask_openai(prompt: str, mode: str = "default") -> str:
     system_prompt = MODES.get(mode, MODES["default"])
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ]
-        )
+        client = openai.OpenAI()
+
+response = client.chat.completions.create(
+    model="gpt-3.5-turbo",
+    messages=[
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": prompt}
+    ]
+)
+
+return response.choices[0].message.content.strip()
         return response["choices"][0]["message"]["content"].strip()
     except Exception as e:
         return f"Произошла ошибка при запросе к ИИ: {str(e)}"
