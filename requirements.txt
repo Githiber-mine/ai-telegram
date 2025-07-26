@@ -2,3 +2,4 @@ python-telegram-bot==20.8
 openai
 python-dotenv
 nest_asyncio>=1.5
+tiktoken==0.5.1
