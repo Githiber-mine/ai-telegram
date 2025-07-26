@@ -2,6 +2,26 @@ from logger import logger
 import os
 from typing import Dict
 
+import json
+
+#загрузка настроек из json
+SETTINGS_FILE = "chat_settings.json"
+
+def load_chat_settings():
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_chat_settings():
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump({
+            "modes": current_mode_per_chat,
+            "random": random_mode_per_chat
+        }, f, indent=2, ensure_ascii=False)
+
+
+#импорт ТГ и ИИ
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, MessageHandler,
@@ -13,15 +33,20 @@ client = openai.OpenAI(
     base_url="https://api.together.xyz/v1"
 )
 
+
+#загружаем админов и импорт функций
 from auth import load_admins
 import random
 import asyncio
 
-# Загружаем список админов при запуске
+#присваеваем список админов переменной
 ADMINS = load_admins()
 
-#Случайные ответы
-random_mode_per_chat = {}
+#загрузка настроек мода и рандома
+settings = load_chat_settings()
+random_mode_per_chat = settings.get("random", {})
+current_mode_per_chat = settings.get("modes", {})
+
 
 
 #Получение ключей из переменных окружения
@@ -37,9 +62,6 @@ MODES: Dict[str, str] = {
     "horne": "Ты властный ИИ с именем Чонгук,который часто подкатывает и флиртует.",
     "zen": "Ты говоришь как спокойный учитель дзен, коротко, мудро и без лишнего."
 }
-
-#Текущий режим (на время работы)
-current_mode_per_chat = {}
 
 
 #Запрос в OpenAI с учётом выбранного режима
@@ -160,6 +182,7 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_mode = context.args[0].lower()
         if new_mode in MODES:
             current_mode_per_chat[chat_id] = new_mode
+            save_chat_settings()
             await message.reply_text(
                 f"✅ Режим для этого чата установлен на: *{new_mode}*",
                 parse_mode="Markdown"
@@ -190,6 +213,7 @@ async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = True
+    save_chat_settings()
     await update.message.reply_text("✅ Случайные ответы включены для этого чата (20% шанс).")
 
 # 🚫 Отключить случайные ответы
@@ -201,6 +225,7 @@ async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = False
+    save_chat_settings()
     await update.message.reply_text("🚫 Случайные ответы отключены для этого чата.")
 
 
