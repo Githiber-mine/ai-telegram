@@ -10,6 +10,7 @@ from telegram.ext import (
 import openai
 from auth import load_admins
 import random
+import asyncio
 
 # Загружаем список админов при запуске
 ADMINS = load_admins()
