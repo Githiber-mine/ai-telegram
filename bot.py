@@ -97,7 +97,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             logger.info(f"➡️ Отправляем в OpenAI: {prompt}")
-            response = await ask_openai(prompt)
+            mode = current_mode_per_chat.get(chat_id, "default")
+            response = await ask_openai(prompt, mode=mode)
             await message.reply_text(response)
             logger.info("✅ Ответ отправлен пользователю.")
         except Exception as e:
