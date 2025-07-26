@@ -63,22 +63,39 @@ MODES: Dict[str, str] = {
     "zen": "Ты говоришь как спокойный учитель дзен, коротко, мудро и без лишнего."
 }
 
+# История сообщений для каждого чата (max 10 сообщений)
+chat_history: Dict[int, list] = {}
+MAX_HISTORY = 10
 
-#Запрос в OpenAI с учётом выбранного режима
-async def ask_openai(prompt: str, mode: str = "default") -> str:
+# Запрос в Together AI с учётом режима
+async def ask_openai(chat_id: int, mode: str = "default") -> str:
     system_prompt = MODES.get(mode, MODES["default"])
+    messages = [{"role": "system", "content": system_prompt}]
+    messages += chat_history.get(chat_id, [])
+
     try:
         response = client.chat.completions.create(
-            model="mistralai/Mistral-7B-Instruct-v0.1",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ]
+            model="openchat/openchat-3.5-1210",
+            messages=messages,
+            temperature=0.7,
+            top_p=0.95,
+            max_tokens=512,
+            timeout=20
         )
-        return response.choices[0].message.content.strip()
+        raw = response.choices[0].message.content.strip()
+        cleaned = (
+            raw.replace("<</SYS>>", "")
+               .replace("<<SYS>>", "")
+               .replace("ASSISTANT:", "")
+               .replace("###", "")
+               .strip()
+        )
+        return cleaned
     except Exception as e:
-        return f"Произошла ошибка при запросе к ИИ: {str(e)}"
-#Ответы на упоминания и ответы
+        return f"❌ Ошибка от Together: {str(e)}"
+
+
+#Обработка входящего сообщения
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
@@ -90,9 +107,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user.username or update.effective_user.id
     logger.info(f"📩 Сообщение от @{user}: {text}")
 
-    # 🔍 Получаем настройки для чата (по умолчанию — True)
+    # 🔍 Настройки
     random_enabled = random_mode_per_chat.get(chat_id, True)
-
     mentioned = BOT_USERNAME.lower() in text.lower()
     is_reply = (
         message.reply_to_message and
@@ -100,7 +116,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message.reply_to_message.from_user.username == context.bot.username
     )
 
-    # 🧠 Ранняя проверка — если бот не упомянут, не в ответе и рандом отключён — выходим
     if not (mentioned or is_reply or random_enabled):
         logger.debug("⏩ Сообщение проигнорировано (нет упоминания, не реплай и рандом выкл).")
         return
@@ -125,15 +140,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.info("❗ Получено только упоминание, без текста.")
             return
 
+        # ✏️ Обновление истории чата
+        if chat_id not in chat_history:
+            chat_history[chat_id] = []
+
+        chat_history[chat_id].append({"role": "user", "content": prompt})
+        chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+
         try:
-            logger.info(f"➡️ Отправляем в OpenAI: {prompt}")
+            logger.info(f"➡️ Отправляем в Together: {prompt}")
             mode = current_mode_per_chat.get(chat_id, "default")
-            response = await ask_openai(prompt, mode=mode)
-            await message.reply_text(response)
-            logger.info("✅ Ответ отправлен пользователю.")
+            reply = await ask_openai(chat_id, mode=mode)
+
+            # Добавляем ответ в историю
+            chat_history[chat_id].append({"role": "assistant", "content": reply})
+            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+
+            await message.reply_text(reply)
+            logger.info(f"🤖 Ответ для @{user}: {response}")
         except Exception as e:
-            logger.error(f"❌ Ошибка при запросе к OpenAI: {e}")
-            await message.reply_text("Произошла ошибка при обращении к GPT.")
+            logger.error(f"❌ Ошибка при запросе: {e}")
+            await message.reply_text("Произошла ошибка при обращении к ИИ.")
 
 
 
