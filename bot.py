@@ -79,23 +79,22 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
     base_model = "mistralai/Mixtral-8x7B-Instruct-v0.1"
 
     # Получаем и валидируем историю
-    history = chat_history.get(chat_id, [])
-    valid_history = [msg for msg in history if is_valid_message(msg)]
+    raw_history = chat_history.get(chat_id, [])
+    valid_history = [msg for msg in raw_history if is_valid_message(msg)]
     trimmed = valid_history[-MAX_HISTORY:]
 
-    # Определяем последние два user-сообщения
-    user_indices = [i for i, msg in enumerate(trimmed) if msg["role"] == "user"]
-    last_two_indices = set(user_indices[-2:])  # индексы двух последних user-сообщений
-
-    # Формируем messages с инъекцией system_prompt
+    # Не изменяем оригинальную историю — делаем копию
     messages = []
+    user_indices = [i for i, msg in enumerate(trimmed) if msg["role"] == "user"]
+    last_two_indices = set(user_indices[-2:])
+
     for idx, msg in enumerate(trimmed):
         content = msg["content"].strip()
         if idx in last_two_indices and msg["role"] == "user":
             content = f"{system_prompt}\n\n{content}"
         messages.append({
             "role": msg["role"],
-            "content": content[:2000]  # обрезка длинных сообщений
+            "content": content[:2000]  # защита от переполнения
         })
 
     try:
