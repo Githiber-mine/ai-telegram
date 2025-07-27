@@ -119,11 +119,15 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
+        logger.debug("Пустое сообщение или отсутствует текст — игнор.")
         return
 
     text = message.text.strip()
     chat_id = update.effective_chat.id
+    user = update.effective_user.username or update.effective_user.id
+    logger.info(f"📩 Сообщение от @{user}: {text}")
 
+    # 🔍 Настройки
     random_enabled = random_mode_per_chat.get(chat_id, True)
     mentioned = BOT_USERNAME.lower() in text.lower()
     is_reply = (
@@ -132,33 +136,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message.reply_to_message.from_user.username == context.bot.username
     )
 
-    # Условия, при которых бот должен ответить
-    should_reply = mentioned or is_reply or (random_enabled and random.random() < 0.1)
-
-    if not should_reply:
+    if not (mentioned or is_reply or random_enabled):
+        logger.debug("⏩ Сообщение проигнорировано (нет упоминания, не реплай и рандом выкл).")
         return
 
-    # Удаление упоминания имени бота из текста
-    prompt = text.replace(BOT_USERNAME, "").strip()
-    if not prompt:
-        if not is_reply:
-            await message.reply_text("Пожалуйста, задайте вопрос.")
-        return
+    should_reply = False
+    random_triggered = False
 
-    # Обновление истории чата
-    chat_history.setdefault(chat_id, []).append({"role": "user", "content": prompt})
-    chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+    if mentioned or is_reply:
+        should_reply = True
+        logger.info("🔁 Ответ из-за упоминания или реплая.")
+    elif random_enabled and random.random() < 0.1:
+        should_reply = True
+        random_triggered = True
+        logger.info("🎲 Ответ сработал по случайному триггеру (10%).")
 
-    try:
-        mode = current_mode_per_chat.get(chat_id, "default")
-        reply = await ask_openai(chat_id, mode=mode)
+    if should_reply:
+        prompt = text.replace(BOT_USERNAME, "").strip()
 
-        chat_history[chat_id].append({"role": "assistant", "content": reply})
+        if not prompt:
+            if not random_triggered:
+                await message.reply_text("Пожалуйста, задайте вопрос.")
+                logger.info("❗ Получено только упоминание, без текста.")
+            return
+
+        # ✏️ Обновление истории чата
+        if chat_id not in chat_history:
+            chat_history[chat_id] = []
+        logger.debug(f"Добавляется в историю: role=user, content={repr(prompt)}")
+        chat_history[chat_id].append({"role": "user", "content": prompt})
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
-        await message.reply_text(reply)
-    except Exception:
-        await message.reply_text("Произошла ошибка при обращении к ИИ.")
+        try:
+            logger.info(f"➡️ Отправляем в Together: {prompt}")
+            mode = current_mode_per_chat.get(chat_id, "default")
+            logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
+            reply = await ask_openai(chat_id, mode=mode)
+
+            # Добавляем ответ в историю
+            chat_history[chat_id].append({"role": "assistant", "content": reply})
+            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+
+            await message.reply_text(reply)
+            logger.info(f"🤖 Ответ для @{user}: {reply}")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при запросе: {e}")
+            await message.reply_text("Произошла ошибка при обращении к ИИ.")
 
 
 
