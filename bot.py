@@ -3,22 +3,6 @@ import os
 from typing import Dict
 
 import json
-import tiktoken
-
-
-#подсчёт токенов
-def count_tokens(messages, model="mistralai/Mixtral-8x7B-Instruct-v0.1"):  # можно заменить на Mixtral, если нужно
-    try:
-        enc = tiktoken.encoding_for_model(model)
-    except KeyError:
-        enc = tiktoken.get_encoding("cl100k_base")
-
-    total_tokens = 0
-    for message in messages:
-        total_tokens += 4  # Примерный overhead на каждое сообщение
-        total_tokens += len(enc.encode(message.get("content", "")))
-    total_tokens += 2  # Завершение assistant
-    return total_tokens
 
 #загрузка настроек из json
 SETTINGS_FILE = "chat_settings.json"
@@ -72,7 +56,7 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "@userbot")
 MODES: Dict[str, str] = {
      "default": "Ты дружелюбный собеседник в Telegram. Общайся как обычный человек — с добротой, краткостью и лёгким юмором.",
     "angry": "Ты немного раздражён. Отвечай резко, коротко и без лишних слов. Можешь использовать лёгкий сарказм.",
-    "horne": "Ты флиртующий собеседник. Общайся уверенно, игриво и с настойчивым характером.",
+    "horne": "Ты флиртующий собеседник с именем Чонгук. Общайся уверенно, игриво и с настойчивым характером.",
     "zen": "Ты спокойный и рассудительный человек. Отвечай кратко, уравновешенно и мудро, без суеты."
 }
 
@@ -91,36 +75,36 @@ def is_valid_message(msg: dict) -> bool:
 
 # Асинхронный запрос с валидацией
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
-    system_prompt = MODES.get(mode)
-    if not system_prompt:
-        logger.warning(f"⚠️ Неизвестный режим: {mode}. Используем default.")
-        system_prompt = MODES["default"]
-
+    system_prompt = MODES.get(mode, MODES["default"])
     base_model = "mistralai/Mixtral-8x7B-Instruct-v0.1"
-    max_prompt_tokens = 3000  # Чтобы оставить запас на ответ (до 1024)
 
     # Получаем и валидируем историю
     history = chat_history.get(chat_id, [])
     valid_history = [msg for msg in history if is_valid_message(msg)]
 
-    # Если есть хотя бы одно сообщение от user — вставим system_prompt внутрь
-    if valid_history and valid_history[-1]["role"] == "user":
-        valid_history[-1]["content"] = f"{system_prompt}\n\n{valid_history[-1]['content']}"
+    # Обрезаем историю
+    trimmed = valid_history[-MAX_HISTORY:]
 
-    # Начинаем собирать сообщения
+    # Клонируем и добавляем промт только к последним двум сообщениям пользователя
     messages = []
+    user_msg_count = 0
 
-    for msg in reversed(valid_history):
-        messages.insert(0, msg)  # вставляем в начало
-        if count_tokens(messages, model=base_model) > max_prompt_tokens:
-            messages.pop(0)  # удаляем последнее добавленное (вверх)
-            break
+    for msg in trimmed:
+        if msg["role"] == "user":
+            user_msg_count += 1
+            if user_msg_count > len([m for m in trimmed if m["role"] == "user"]) - 2:
+                # Только к последним двум user-сообщениям добавляем system_prompt
+                modified = msg.copy()
+                modified["content"] = f"{system_prompt}\n\n{modified['content']}"
+                messages.append(modified)
+                continue
+        messages.append(msg)
 
     logger.debug(f"📚 Отправляемые сообщения в Together ({len(messages)}):\n{json.dumps(messages, ensure_ascii=False, indent=2)}")
 
     try:
         response = client.chat.completions.create(
-            model="mistralai/Mixtral-8x7B-Instruct-v0.1",
+            model=base_model,
             messages=messages,
             temperature=0.7,
             top_p=0.95,
@@ -213,8 +197,6 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Я — Telegram-бот на базе ChatGPT.\n\n"
         "🔹 Просто упомяни меня (`@Kraydo_bot`) в сообщении — и я отвечу.\n"
         "🔹 Или ответь на одно из моих сообщений — я продолжу разговор.\n"
-        "🔹 Хочешь сменить стиль общения? Используй команду: `/mode`\n"
-        "   Например: `/mode funny`, `/mode angry`, `/mode zen`\n\n"
         "📜 Посмотреть условия использования: `/terms`\n\n"
         "Готов помочь — спрашивай!"
     )
@@ -265,7 +247,7 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await message.reply_text(
             f"🧠 Текущий режим для этого чата: *{current}*\n"
             f"Доступные: `{', '.join(MODES.keys())}`\n\n"
-            f"Чтобы изменить: `/mode funny`",
+            f"Чтобы изменить: `/mode режим`",
             parse_mode="Markdown"
         )
 
