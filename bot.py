@@ -54,9 +54,9 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "@userbot")
 
 #Характеры бота (моды)
 MODES: Dict[str, str] = {
-     "default": "Ты дружелюбный собеседник в Telegram. Всегда отвечай на русском языке. Общайся как обычный человек — с добротой, краткостью и лёгким юмором.",
+     "default": "Ты дружелюбный собеседник в Telegram. Всегда отвечай на русском языке. Общайся краткостью и лёгким юмором.",
     "angry": "Ты немного раздражён. Всегда отвечай на русском языке. Отвечай резко, коротко и без лишних слов. Можешь использовать лёгкий сарказм.",
-    "horne": "Ты флиртующий собеседник. Всегда отвечай на русском языке. Общайся уверенно, игриво и с настойчивым характером.",
+    "horne": "Ты флиртующий собеседник с именем Чонгук. Всегда отвечай на русском языке. Общайся уверенно, игриво и с настойчивым характером.",
     "zen": "Ты спокойный и рассудительный человек. Всегда отвечай на русском языке. Отвечай кратко, уравновешенно и мудро, без суеты."
 }
 
@@ -70,7 +70,7 @@ def is_valid_message(msg: dict) -> bool:
         isinstance(msg, dict)
         and msg.get("role") in {"system", "user", "assistant"}
         and isinstance(msg.get("content"), str)
-        and msg.get("content").strip() != ""
+        and 0 < len(msg["content"].strip()) <= 2000  # ограничим по длине
     )
 
 # Асинхронный запрос с валидацией
@@ -81,27 +81,22 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
     # Получаем и валидируем историю
     history = chat_history.get(chat_id, [])
     valid_history = [msg for msg in history if is_valid_message(msg)]
-
-    # Обрезаем историю
     trimmed = valid_history[-MAX_HISTORY:]
 
-    # Подсчитываем количество пользовательских сообщений
-    user_messages = [m for m in trimmed if m["role"] == "user"]
-    total_user_count = len(user_messages)
+    # Определяем последние два user-сообщения
+    user_indices = [i for i, msg in enumerate(trimmed) if msg["role"] == "user"]
+    last_two_indices = set(user_indices[-2:])  # индексы двух последних user-сообщений
 
-    # Добавляем prompt только к последним двум user-сообщениям
+    # Формируем messages с инъекцией system_prompt
     messages = []
-    user_seen = 0
-
-    for msg in trimmed:
-        if msg["role"] == "user":
-            user_seen += 1
-            if user_seen > total_user_count - 2:
-                modified = msg.copy()
-                modified["content"] = f"{system_prompt}\n\n{modified['content']}"
-                messages.append(modified)
-                continue
-        messages.append(msg)
+    for idx, msg in enumerate(trimmed):
+        content = msg["content"].strip()
+        if idx in last_two_indices and msg["role"] == "user":
+            content = f"{system_prompt}\n\n{content}"
+        messages.append({
+            "role": msg["role"],
+            "content": content[:2000]  # обрезка длинных сообщений
+        })
 
     try:
         response = client.chat.completions.create(
@@ -109,12 +104,12 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
             messages=messages,
             temperature=0.7,
             top_p=0.95,
-            max_tokens=1024,
-            timeout=20
+            max_tokens=1024
         )
         return response.choices[0].message.content.strip()
     except Exception as e:
         return f"❌ Ошибка от Together: {str(e)}"
+
 
 #Обработка входящего сообщения
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
