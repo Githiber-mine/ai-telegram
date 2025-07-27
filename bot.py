@@ -77,35 +77,40 @@ def is_valid_message(msg: dict) -> bool:
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
     system_prompt = MODES.get(mode, MODES["default"])
     base_model = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    max_chars = 4000  # ⛔️ Ограничение по длине prompt (в символах)
 
     # Получаем и валидируем историю
     raw_history = chat_history.get(chat_id, [])
     valid_history = [msg for msg in raw_history if is_valid_message(msg)]
     trimmed = valid_history[-MAX_HISTORY:]
 
-    # Не изменяем оригинальную историю — делаем копию
-    messages = []
-    user_indices = [i for i, msg in enumerate(trimmed) if msg["role"] == "user"]
-    last_two_indices = set(user_indices[-2:])
-
-    for idx, msg in enumerate(trimmed):
+    # Сборка промта вручную
+    prompt_parts = [system_prompt.strip(), ""]
+    for msg in trimmed:
+        role = msg["role"]
         content = msg["content"].strip()
-        if idx in last_two_indices and msg["role"] == "user":
-            content = f"{system_prompt}\n\n{content}"
-        messages.append({
-            "role": msg["role"],
-            "content": content[:2000]  # защита от переполнения
-        })
+
+        if role == "user":
+            prompt_parts.append(f"Пользователь: {content}")
+        elif role == "assistant":
+            prompt_parts.append(f"ИИ: {content}")
+
+    prompt_parts.append("ИИ:")
+    full_prompt = "\n".join(prompt_parts).strip()
+
+    # ✅ Ограничение по длине
+    if len(full_prompt) > max_chars:
+        full_prompt = full_prompt[-max_chars:]  # обрезаем с начала, оставляя концовку
 
     try:
-        response = client.chat.completions.create(
+        response = client.completions.create(
             model=base_model,
-            messages=messages,
+            prompt=full_prompt,
             temperature=0.7,
             top_p=0.95,
             max_tokens=1024
         )
-        return response.choices[0].message.content.strip()
+        return response.choices[0].text.strip()
     except Exception as e:
         return f"❌ Ошибка от Together: {str(e)}"
 
@@ -114,15 +119,11 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     if not message or not message.text:
-        logger.debug("Пустое сообщение или отсутствует текст — игнор.")
         return
 
-    text = message.text
+    text = message.text.strip()
     chat_id = update.effective_chat.id
-    user = update.effective_user.username or update.effective_user.id
-    logger.info(f"📩 Сообщение от @{user}: {text}")
 
-    # 🔍 Настройки
     random_enabled = random_mode_per_chat.get(chat_id, True)
     mentioned = BOT_USERNAME.lower() in text.lower()
     is_reply = (
@@ -131,52 +132,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message.reply_to_message.from_user.username == context.bot.username
     )
 
-    if not (mentioned or is_reply or random_enabled):
-        logger.debug("⏩ Сообщение проигнорировано (нет упоминания, не реплай и рандом выкл).")
+    # Условия, при которых бот должен ответить
+    should_reply = mentioned or is_reply or (random_enabled and random.random() < 0.1)
+
+    if not should_reply:
         return
 
-    should_reply = False
-    random_triggered = False
+    # Удаление упоминания имени бота из текста
+    prompt = text.replace(BOT_USERNAME, "").strip()
+    if not prompt:
+        if not is_reply:
+            await message.reply_text("Пожалуйста, задайте вопрос.")
+        return
 
-    if mentioned or is_reply:
-        should_reply = True
-        logger.info("🔁 Ответ из-за упоминания или реплая.")
-    elif random_enabled and random.random() < 0.1:
-        should_reply = True
-        random_triggered = True
-        logger.info("🎲 Ответ сработал по случайному триггеру (10%).")
+    # Обновление истории чата
+    chat_history.setdefault(chat_id, []).append({"role": "user", "content": prompt})
+    chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
-    if should_reply:
-        prompt = text.replace(BOT_USERNAME, "").strip()
+    try:
+        mode = current_mode_per_chat.get(chat_id, "default")
+        reply = await ask_openai(chat_id, mode=mode)
 
-        if not prompt:
-            if not random_triggered:
-                await message.reply_text("Пожалуйста, задайте вопрос.")
-                logger.info("❗ Получено только упоминание, без текста.")
-            return
-
-        # ✏️ Обновление истории чата
-        if chat_id not in chat_history:
-            chat_history[chat_id] = []
-        logger.debug(f"Добавляется в историю: role=user, content={repr(prompt)}")
-        chat_history[chat_id].append({"role": "user", "content": prompt})
+        chat_history[chat_id].append({"role": "assistant", "content": reply})
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
-        try:
-            logger.info(f"➡️ Отправляем в Together: {prompt}")
-            mode = current_mode_per_chat.get(chat_id, "default")
-            logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
-            reply = await ask_openai(chat_id, mode=mode)
+        await message.reply_text(reply)
+    except Exception:
+        await message.reply_text("Произошла ошибка при обращении к ИИ.")
 
-            # Добавляем ответ в историю
-            chat_history[chat_id].append({"role": "assistant", "content": reply})
-            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
-
-            await message.reply_text(reply)
-            logger.info(f"🤖 Ответ для @{user}: {reply}")
-        except Exception as e:
-            logger.error(f"❌ Ошибка при запросе: {e}")
-            await message.reply_text("Произошла ошибка при обращении к ИИ.")
 
 
 
