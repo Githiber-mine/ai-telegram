@@ -78,7 +78,7 @@ MODES: Dict[str, str] = {
 
 # История сообщений для каждого чата (max 10 сообщений)
 chat_history: Dict[int, list] = {}
-MAX_HISTORY = 6
+MAX_HISTORY = 4
 
 # Валидация одного сообщения
 def is_valid_message(msg: dict) -> bool:
