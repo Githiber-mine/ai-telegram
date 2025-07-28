@@ -64,15 +64,16 @@ MODES: Dict[str, str] = {
 
 # История сообщений для каждого чата (max 10 сообщений)
 chat_history: Dict[int, list] = {}
-MAX_HISTORY = 4
+MAX_HISTORY = 6
 
 # Валидация одного сообщения
 def is_valid_message(msg: dict) -> bool:
+    content = msg.get("content", "")
     return (
         isinstance(msg, dict)
         and msg.get("role") in {"system", "user", "assistant"}
-        and isinstance(msg.get("content"), str)
-        and 0 < len(msg["content"].strip()) <= 2000  # ограничим по длине
+        and isinstance(content, str)
+        and 0 < len(content.strip()) <= 2000
     )
 
 # Асинхронный запрос с валидацией
@@ -124,10 +125,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.debug("Пустое сообщение или отсутствует текст — игнор.")
         return
 
-    # 🛡️ Защита от самореплаев и ботов
-    if message.from_user and message.from_user.is_bot:
-        logger.debug("📵 Игнор: сообщение от другого бота (или от себя)")
-        return
 
     text = message.text.strip()
     chat_id = update.effective_chat.id
@@ -137,11 +134,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🔍 Настройки
     random_enabled = random_mode_per_chat.get(chat_id, True)
     mentioned = BOT_USERNAME.lower() in text.lower()
-    is_reply = (
-        message.reply_to_message and
-        message.reply_to_message.from_user and
-        message.reply_to_message.from_user.username == context.bot.username
-    )
+  is_reply = (
+    message.reply_to_message and
+    message.reply_to_message.from_user and
+    message.reply_to_message.from_user.id == context.bot.id
+)
 
     if not (mentioned or is_reply or random_enabled):
         logger.debug("⏩ Сообщение проигнорировано (нет упоминания, не реплай и рандом выкл).")
@@ -208,8 +205,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ▶️ Обработчик команды /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    first_name = user.first_name if user else "друг"
+first_name = update.effective_user.first_name
 
     message = (
         f"👋 Привет, {first_name}!\n\n"
@@ -281,7 +277,7 @@ async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = True
     save_chat_settings()
-    await update.message.reply_text("✅ Случайные ответы включены для этого чата (20% шанс).")
+    await update.message.reply_text("✅ Случайные ответы включены для этого чата (10% шанс).")
 
 # 🚫 Отключить случайные ответы
 async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
