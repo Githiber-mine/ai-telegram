@@ -76,6 +76,19 @@ MODES = {
 }
 
 
+# 📌 Индивидуальные роли пользователей
+USER_ROLES = {
+    123456789: "жена",     # user_id: роль
+    987654321: "отец",
+}
+
+ROLE_PROMPTS = {
+    "жена": "Ты общаешься со своей женой. Будь ласковым, внимательным и заботливым.",
+    "отец": "Ты говоришь с отцом. Общайся уважительно и сдержанно.",
+    "брат": "Ты общаешься с братом. Будь дружелюбным, прямым и неформальным.",
+}
+
+
 # История сообщений для каждого чата (max 10 сообщений)
 chat_history: Dict[int, list] = {}
 MAX_HISTORY = 6
@@ -91,6 +104,7 @@ def is_valid_message(msg: dict) -> bool:
     )
 
 # Асинхронный запрос с валидацией
+# Асинхронный запрос с валидацией и вставкой роли
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
     system_prompt = MODES.get(mode, MODES["default"])
     base_model = "mistralai/Mistral-7B-Instruct-v0.2"
@@ -101,12 +115,22 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
     valid_history = [msg for msg in raw_history if is_valid_message(msg)]
     trimmed = valid_history[-MAX_HISTORY:]
 
-    # Сборка промта вручную
+    # 🔧 Сборка промта
     prompt_parts = [system_prompt.strip(), ""]
+
+    # 📌 Вставка персональной роли (если назначена пользователю)
+    user_id = last_user_message_id_per_chat.get(chat_id)
+    role = USER_ROLES.get(user_id)
+    if role:
+        role_prompt = ROLE_PROMPTS.get(role)
+        if role_prompt:
+            prompt_parts.append(role_prompt.strip())
+            prompt_parts.append("")  # отступ для читаемости
+
+    # 🧠 История диалога
     for msg in trimmed:
         role = msg["role"]
         content = msg["content"].strip()
-
         if role == "user":
             prompt_parts.append(f"Пользователь: {content}")
         elif role == "assistant":
@@ -130,6 +154,7 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
         return response.choices[0].text.strip()
     except Exception as e:
         return f"❌ Ошибка от Together: {str(e)}"
+
 
 
 #Обработка входящего сообщения
@@ -188,6 +213,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"➡️ Отправляем в Together: {prompt}")
             mode = current_mode_per_chat.get(chat_id, "default")
             logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
+
+            # Сохраняем user_id для вставки роли (для ask_openai)
+            last_user_message_id_per_chat[chat_id] = update.effective_user.id
+
             reply = await ask_openai(chat_id, mode=mode)
 
             # 🔧 Очистка вложенного диалога
