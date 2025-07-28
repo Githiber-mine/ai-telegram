@@ -184,34 +184,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_history[chat_id].append({"role": "user", "content": prompt})
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
-try:
-    logger.info(f"➡️ Отправляем в Together: {prompt}")
-    mode = current_mode_per_chat.get(chat_id, "default")
-    logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
-    reply = await ask_openai(chat_id, mode=mode)
+        try:
+            logger.info(f"➡️ Отправляем в Together: {prompt}")
+            mode = current_mode_per_chat.get(chat_id, "default")
+            logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
+            reply = await ask_openai(chat_id, mode=mode)
 
-    # Очистка вложенного диалога
-    reply = clean_ai_reply(reply)
+            # 🔧 Очистка вложенного диалога
+            reply = clean_ai_reply(reply)
 
-    if not reply or len(reply) > 1000:
-        logger.warning("⚠️ Ответ ИИ выглядит некорректно или слишком длинный — не отправляем и не сохраняем.")
-        await message.reply_text("⚠️ Произошла ошибка генерации. Пожалуйста, переформулируйте вопрос.")
-        return
+            if not reply or len(reply) > 1000:
+                logger.warning("⚠️ Ответ ИИ выглядит некорректно или слишком длинный — не отправляем и не сохраняем.")
+                await message.reply_text("⚠️ Произошла ошибка генерации. Пожалуйста, переформулируйте вопрос.")
+                return
 
-    # Сохраняем очищенный ответ
-    chat_history[chat_id].append({"role": "assistant", "content": reply})
-    chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
-    logger.debug("✅ Ответ ИИ добавлен в историю.")
-    await message.reply_text(reply)
-    logger.info(f"🤖 Ответ для @{user}: {reply}")
+            # 💾 Сохраняем очищенный ответ
+            chat_history[chat_id].append({"role": "assistant", "content": reply})
+            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+            logger.debug("✅ Ответ ИИ добавлен в историю.")
+            await message.reply_text(reply)
+            logger.info(f"🤖 Ответ для @{user}: {reply}")
 
-except Exception as e:
-    logger.error(f"❌ Ошибка при запросе: {e}")
-    await message.reply_text("Произошла ошибка при обращении к ИИ.")
+        except Exception as e:
+            logger.error(f"❌ Ошибка при запросе: {e}")
+            await message.reply_text("Произошла ошибка при обращении к ИИ.")
 
 #очистка
 
 def clean_ai_reply(reply: str) -> str:
+    # Удаляем строки вида "Пользователь: ..." или "Assistant: ..."
     cleaned = re.sub(r"(?i)(пользователь|user|assistant):.*(\n|$)", "", reply)
     return cleaned.strip()
 
