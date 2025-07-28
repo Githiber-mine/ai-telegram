@@ -212,10 +212,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #очистка
 
 def clean_ai_reply(reply: str) -> str:
-    # Удаляем строки вида "Пользователь: ..." или "Assistant: ..."
-    cleaned = re.sub(r"(?i)(пользователь|user|assistant):.*(\n|$)", "", reply)
-    return cleaned.strip()
-
+    # Удаляем все строки, начинающиеся на "ИИ:", "User:", "Assistant:", "Пользователь:"
+    cleaned_lines = []
+    for line in reply.splitlines():
+        if not re.match(r"(?i)^\s*(ИИ:|user:|assistant:|пользователь:)", line.strip()):
+            cleaned_lines.append(line)
+    return "\n".join(cleaned_lines).strip()
 
 # ▶️ Обработчик команды /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
