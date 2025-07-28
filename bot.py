@@ -204,7 +204,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ▶️ Обработчик команды /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-first_name = update.effective_user.first_name
+    first_name = update.effective_user.first_name
 
     message = (
         f"👋 Привет, {first_name}!\n\n"
