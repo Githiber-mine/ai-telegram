@@ -1,7 +1,7 @@
 from together import Together
+from config import TOGETHER_API_KEY, MODES, MAX_HISTORY
+from utils.validator import is_valid_message
 from utils.history import chat_history
-
-
 
 
 # Асинхронный запрос с валидацией
