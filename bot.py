@@ -4,7 +4,19 @@ from typing import Dict
 
 import json
 
-#загрузка настроек из json
+
+#Получение ключей из переменных окружения
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
+BOT_USERNAME = os.getenv("BOT_USERNAME", "@userbot")
+DATABASE_URL = os.getenv("DATABASE_URL")
+db_pool = None
+
+random_mode_per_chat = {}
+current_mode_per_chat = {}
+
+
+#загрузка настроек
 SETTINGS_FILE = "chat_settings.json"
 
 async def load_chat_settings():
@@ -42,12 +54,8 @@ ADMIN_USER_ID = 7029603268
 import asyncpg
 import asyncio
 
-#загрузка настроек мода и рандома
-chat_settings = load_chat_settings()
-random_mode_per_chat = chat_settings.setdefault("random", {})
-current_mode_per_chat = chat_settings.setdefault("modes", {})
 
-#сохранение настроек в json
+#сохранение настроек
 async def save_chat_settings(chat_id: int):
     mode = current_mode_per_chat.get(chat_id, "default")
     random_enabled = random_mode_per_chat.get(chat_id, True)
@@ -74,14 +82,6 @@ async def init_db():
                 random_enabled BOOLEAN DEFAULT TRUE
             );
         """)
-
-
-#Получение ключей из переменных окружения
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
-BOT_USERNAME = os.getenv("BOT_USERNAME", "@userbot")
-DATABASE_URL = os.getenv("DATABASE_URL")
-db_pool = None
 
 
 #Характеры бота (моды)
@@ -360,6 +360,7 @@ async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 #запуск бота
 async def main():
     await init_db()
+    await load_chat_settings()
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
      # Очистка старых апдейтов
