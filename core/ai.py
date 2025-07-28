@@ -11,20 +11,28 @@ BASE_MODEL = "mistralai/Mixtral-8x7B-Instruct-v0.1"
 MAX_CHARS = 4000
 
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
-    system_prompt = MODES.get(mode, MODES["default"])
+    system_prompt = MODES.get(mode, MODES["default"]).strip()
     raw_history = chat_history.get(chat_id, [])
     valid_history = [m for m in raw_history if is_valid_message(m.get("content"))]
     trimmed = valid_history[-MAX_HISTORY:]
 
-    prompt_parts = [system_prompt.strip(), ""]
-    for msg in trimmed:
+    prompt_parts = []
+
+    for i, msg in enumerate(trimmed):
         role = msg.get("role")
         content = msg.get("content", "").strip()
-        if role == "user":
+
+        # Встраиваем стиль в последнее сообщение пользователя
+        if i == len(trimmed) - 1 and role == "user":
+            styled_message = f"({system_prompt})\n{content}"
+            prompt_parts.append(f"Пользователь: {styled_message}")
+        elif role == "user":
             prompt_parts.append(f"Пользователь: {content}")
         elif role == "assistant":
             prompt_parts.append(f"ИИ: {content}")
+
     prompt_parts.append("ИИ:")
+
     full_prompt = "\n".join(prompt_parts).strip()
 
     if len(full_prompt) > MAX_CHARS:
