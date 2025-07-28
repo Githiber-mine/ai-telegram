@@ -31,6 +31,7 @@ client = openai.OpenAI(
 from auth import load_admins
 import random
 import asyncio
+import re
 
 #присваеваем список админов переменной
 ADMINS = load_admins()
@@ -190,25 +191,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply = await ask_openai(chat_id, mode=mode)
 
             # 📏 Проверка на вложенный диалог и недопустимый ответ
-            def is_valid_ai_reply(reply: str) -> bool:
-                reply_lower = reply.lower()
-                return (
-                    "пользователь:" not in reply_lower
-                    and "user:" not in reply_lower
-                    and "assistant:" not in reply_lower
-                    and len(reply) <= 1000
-                )
+            # 📏 Очистка вложенного диалога и проверка длины
+def clean_ai_reply(reply: str) -> str:
+    # Удаляем вложенные строки формата "Пользователь: ..." или "Assistant: ..."
+    cleaned = re.sub(r"(?i)(пользователь|user|assistant):.*(\n|$)", "", reply)
+    return cleaned.strip()
 
-            if not is_valid_ai_reply(reply):
-                logger.warning("⚠️ Ответ ИИ выглядит как вложенный диалог — не отправляем и не сохраняем.")
-                await message.reply_text("⚠️ Произошла ошибка генерации. Пожалуйста, переформулируйте вопрос.")
-                return
+reply = clean_ai_reply(reply)
 
-            chat_history[chat_id].append({"role": "assistant", "content": reply})
-            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
-            logger.debug("✅ Ответ ИИ добавлен в историю.")
-            await message.reply_text(reply)
-            logger.info(f"🤖 Ответ для @{user}: {reply}")
+if not reply or len(reply) > 1000:
+    logger.warning("⚠️ Ответ ИИ выглядит некорректно или слишком длинный — не отправляем и не сохраняем.")
+    await message.reply_text("⚠️ Произошла ошибка генерации. Пожалуйста, переформулируйте вопрос.")
+    return
+
+# сохраняем очищенный ответ
+chat_history[chat_id].append({"role": "assistant", "content": reply})
+chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+logger.debug("✅ Ответ ИИ добавлен в историю.")
+await message.reply_text(reply)
+logger.info(f"🤖 Ответ для @{user}: {reply}")
 
         except Exception as e:
             logger.error(f"❌ Ошибка при запросе: {e}")
