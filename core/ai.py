@@ -1,5 +1,6 @@
 from together import Together
-from config import TOGETHER_API_KEY, MODES, MAX_HISTORY
+from core.modes import MODES
+from config import TOGETHER_API_KEY, MAX_HISTORY
 from utils.validator import is_valid_message
 from utils.history import chat_history
 
