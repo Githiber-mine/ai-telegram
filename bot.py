@@ -7,12 +7,13 @@ import json
 #загрузка настроек из json
 SETTINGS_FILE = "chat_settings.json"
 
-def load_chat_settings():
-    if os.path.exists(SETTINGS_FILE):
-        with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
-
+async def load_chat_settings():
+    async with db_pool.acquire() as conn:
+        rows = await conn.fetch("SELECT chat_id, mode, random_enabled FROM chat_settings")
+        for row in rows:
+            chat_id = row["chat_id"]
+            current_mode_per_chat[chat_id] = row["mode"]
+            random_mode_per_chat[chat_id] = row["random_enabled"]
 
 #импорт ТГ и ИИ
 from telegram import Update
@@ -38,21 +39,49 @@ ADMINS = load_admins()
 
 ADMIN_USER_ID = 7029603268
 
+import asyncpg
+import asyncio
+
 #загрузка настроек мода и рандома
 chat_settings = load_chat_settings()
 random_mode_per_chat = chat_settings.setdefault("random", {})
 current_mode_per_chat = chat_settings.setdefault("modes", {})
 
 #сохранение настроек в json
-def save_chat_settings():
-    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(chat_settings, f, indent=2, ensure_ascii=False)
+async def save_chat_settings(chat_id: int):
+    mode = current_mode_per_chat.get(chat_id, "default")
+    random_enabled = random_mode_per_chat.get(chat_id, True)
+
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO chat_settings (chat_id, mode, random_enabled)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (chat_id) DO UPDATE SET
+                mode = EXCLUDED.mode,
+                random_enabled = EXCLUDED.random_enabled
+        """, chat_id, mode, random_enabled)
+
+#подключение к датабазе
+async def init_db():
+    global db_pool
+    db_pool = await asyncpg.create_pool(DATABASE_URL)
+    
+    async with db_pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS chat_settings (
+                chat_id BIGINT PRIMARY KEY,
+                mode TEXT DEFAULT 'default',
+                random_enabled BOOLEAN DEFAULT TRUE
+            );
+        """)
 
 
 #Получение ключей из переменных окружения
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 BOT_USERNAME = os.getenv("BOT_USERNAME", "@userbot")
+DATABASE_URL = os.getenv("DATABASE_URL")
+db_pool = None
 
 
 #Характеры бота (моды)
@@ -277,7 +306,7 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if new_mode in MODES:
             current_mode_per_chat[chat_id] = new_mode
             chat_history[chat_id] = []  # 🔥 Очистка истории при смене режима
-            save_chat_settings()
+            await save_chat_settings(chat_id)
             await message.reply_text(
                 f"✅ Режим для этого чата установлен на: *{new_mode}*.\n🧹 Контекст очищен.",
                 parse_mode="Markdown"
@@ -307,7 +336,7 @@ async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = True
-    save_chat_settings()
+    await save_chat_settings(chat_id)
     await update.message.reply_text("✅ Случайные ответы включены для этого чата (10% шанс).")
 
 # 🚫 Отключить случайные ответы
@@ -319,7 +348,7 @@ async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = False
-    save_chat_settings()
+    await save_chat_settings(chat_id)
     await update.message.reply_text("🚫 Случайные ответы отключены для этого чата.")
 
 
@@ -330,6 +359,7 @@ async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 #запуск бота
 async def main():
+    await init_db()
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
      # Очистка старых апдейтов
