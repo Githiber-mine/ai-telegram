@@ -122,6 +122,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.debug("Пустое сообщение или отсутствует текст — игнор.")
         return
 
+       # 🛡️ Защита от самореплаев и ботов
+    if message.from_user and message.from_user.is_bot:
+        logger.debug("📵 Игнор: сообщение от другого бота (или от себя)")
+        return
+
     text = message.text.strip()
     chat_id = update.effective_chat.id
     user = update.effective_user.username or update.effective_user.id
