@@ -134,12 +134,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 🔍 Настройки
     random_enabled = random_mode_per_chat.get(chat_id, True)
     mentioned = BOT_USERNAME.lower() in text.lower()
-  is_reply = (
-    message.reply_to_message and
-    message.reply_to_message.from_user and
-    message.reply_to_message.from_user.id == context.bot.id
-)
-
+    is_reply = (
+        message.reply_to_message
+        and message.reply_to_message.from_user
+        and message.reply_to_message.from_user.id == context.bot.id
+    )
     if not (mentioned or is_reply or random_enabled):
         logger.debug("⏩ Сообщение проигнорировано (нет упоминания, не реплай и рандом выкл).")
         return
