@@ -5,29 +5,37 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from config import TELEGRAM_TOKEN
 from utils.logger import logger
-from core.handler import handle_message, mode_command
-from core.database import init_db
-from utils.auth import load_admins
+from core.handlers import (
+    start_command,
+    terms_command,
+    mode_command,
+    enable_random,
+    disable_random,
+    secret_command,
+    handle_message,
+)
 
-# ✅ Загрузка админов
-ADMINS = load_admins()
-
-# ✅ Главная функция запуска
 async def main():
-    # Инициализация базы данных
-    await init_db()
+    logger.info("🚀 Запуск Telegram-бота...")
+    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
-    # Создание приложения Telegram
-    app = ApplicationBuilder().token("YOUR_BOT_TOKEN_HERE").build()
-
-    # Обработчики команд и сообщений
+    # ✅ Регистрируем команды
+    app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("terms", terms_command))
     app.add_handler(CommandHandler("mode", mode_command))
+    app.add_handler(CommandHandler("randomon", enable_random))
+    app.add_handler(CommandHandler("randomoff", disable_random))
+    app.add_handler(CommandHandler("secret", secret_command))
+
+    # 📨 Обработка всех остальных текстовых сообщений
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Запуск бота
-    logger.info("🤖 Бот запущен.")
     await app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logger.info("🛑 Бот остановлен.")
