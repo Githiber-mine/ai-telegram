@@ -35,6 +35,8 @@ import asyncio
 #присваеваем список админов переменной
 ADMINS = load_admins()
 
+ADMIN_USER_ID = 7029603268
+
 #загрузка настроек мода и рандома
 chat_settings = load_chat_settings()
 random_mode_per_chat = chat_settings.setdefault("random", {})
@@ -54,7 +56,7 @@ BOT_USERNAME = os.getenv("BOT_USERNAME", "@userbot")
 
 #Характеры бота (моды)
 MODES: Dict[str, str] = {
-     "default": "Ты дружелюбный собеседник в Telegram. Всегда отвечай на русском языке. Общайся краткостью и лёгким юмором. Ты пишешь только свой ответ, без подписей Пользователь и ИИ.",
+     "default": "Ты дружелюбный собеседник в Telegram. Всегда отвечай на русском языке. Общайся краткостью и лёгким юмором.",
     "angry": "Ты немного раздражён. Всегда отвечай на русском языке. Отвечай резко, коротко и без лишних слов. Можешь использовать лёгкий сарказм.",
     "horne": "Ты флиртующий собеседник с именем Чонгук. Всегда отвечай на русском языке. Общайся уверенно, игриво и с настойчивым характером.",
     "zen": "Ты спокойный и рассудительный человек. Всегда отвечай на русском языке. Отвечай кратко, уравновешенно и мудро, без суеты."
@@ -122,7 +124,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.debug("Пустое сообщение или отсутствует текст — игнор.")
         return
 
-       # 🛡️ Защита от самореплаев и ботов
+    # 🛡️ Защита от самореплаев и ботов
     if message.from_user and message.from_user.is_bot:
         logger.debug("📵 Игнор: сообщение от другого бота (или от себя)")
         return
@@ -178,9 +180,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
             reply = await ask_openai(chat_id, mode=mode)
 
-            # Добавляем ответ в историю
-            chat_history[chat_id].append({"role": "assistant", "content": reply})
-            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+            # 📏 Защита от вложенного диалога в ответе ИИ
+            def is_valid_ai_reply(reply: str) -> bool:
+                reply_lower = reply.lower()
+                return (
+                    "пользователь:" not in reply_lower
+                    and "user:" not in reply_lower
+                    and "assistant:" not in reply_lower
+                    and len(reply) <= 1000
+                )
+
+            if is_valid_ai_reply(reply):
+                chat_history[chat_id].append({"role": "assistant", "content": reply})
+                chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+                logger.debug("✅ Ответ ИИ добавлен в историю.")
+            else:
+                logger.warning("⚠️ Ответ ИИ выглядит как вложенный диалог — не сохраняем в историю.")
 
             await message.reply_text(reply)
             logger.info(f"🤖 Ответ для @{user}: {reply}")
@@ -303,6 +318,17 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 
     logger.info("Бот запущен...")
+
+   # 📬 Уведомление админу
+    try:
+        await app.bot.send_message(
+            chat_id=ADMIN_USER_ID,
+            text="✅ Бот успешно запущен и готов к работе!"
+        )
+        logger.info(f"📨 Уведомление отправлено админу ({ADMIN_USER_ID})")
+    except Exception as e:
+        logger.error(f"❌ Ошибка при отправке уведомления админу: {e}")
+
     await app.run_polling()
 
 
