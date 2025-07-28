@@ -1,2 +1,8 @@
-def is_valid_message(message: str) -> bool:
-    return bool(message and len(message.strip()) > 0)
+def is_valid_message(msg: dict) -> bool:
+    content = msg.get("content", "")
+    return (
+        isinstance(msg, dict)
+        and msg.get("role") in {"system", "user", "assistant"}
+        and isinstance(content, str)
+        and 0 < len(content.strip()) <= 2000
+    )
