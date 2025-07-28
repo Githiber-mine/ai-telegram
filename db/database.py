@@ -1,30 +1,32 @@
-import aiosqlite
-from config import DB_PATH
+import asyncpg
 from utils.history import current_mode_per_chat, random_mode_per_chat
+from config import DATABASE_URL
 
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('''
-            CREATE TABLE IF NOT EXISTS chat_settings (
-                chat_id INTEGER PRIMARY KEY,
-                mode TEXT DEFAULT 'default',
-                random INTEGER DEFAULT 1
-            )
-        ''')
-        await db.commit()
+    conn = await asyncpg.connect(DATABASE_URL)
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_settings (
+            chat_id BIGINT PRIMARY KEY,
+            mode TEXT DEFAULT 'default',
+            random BOOLEAN DEFAULT TRUE
+        )
+    """)
+    await conn.close()
 
 async def load_chat_settings():
-    async with aiosqlite.connect(DB_PATH) as db:
-        async with db.execute("SELECT chat_id, mode, random FROM chat_settings") as cursor:
-            async for chat_id, mode, random_value in cursor:
-                current_mode_per_chat[chat_id] = mode
-                random_mode_per_chat[chat_id] = bool(random_value)
+    conn = await asyncpg.connect(DATABASE_URL)
+    rows = await conn.fetch("SELECT chat_id, mode, random FROM chat_settings")
+    for row in rows:
+        current_mode_per_chat[row["chat_id"]] = row["mode"]
+        random_mode_per_chat[row["chat_id"]] = row["random"]
+    await conn.close()
 
 async def save_chat_setting(chat_id: int, mode: str, random: bool):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
-            INSERT INTO chat_settings (chat_id, mode, random)
-            VALUES (?, ?, ?)
-            ON CONFLICT(chat_id) DO UPDATE SET mode = excluded.mode, random = excluded.random
-        """, (chat_id, mode, int(random)))
-        await db.commit()
+    conn = await asyncpg.connect(DATABASE_URL)
+    await conn.execute("""
+        INSERT INTO chat_settings (chat_id, mode, random)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (chat_id) DO UPDATE
+        SET mode = EXCLUDED.mode, random = EXCLUDED.random
+    """, chat_id, mode, random)
+    await conn.close()
