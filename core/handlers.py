@@ -1,33 +1,30 @@
+# core/handlers.py
+
+import random
+import re
 from telegram import Update
 from telegram.ext import ContextTypes
+from config import BOT_USERNAME, MAX_HISTORY
+from services.ai import ask_openai
+from storage.memory import chat_history, current_mode_per_chat, random_mode_per_chat
 from utils.logger import logger
-from utils.history import chat_history, current_mode_per_chat, random_mode_per_chat
-from utils.cleaner import clean_ai_reply
-from core.ai import ask_openai
-from config import MAX_HISTORY, BOT_USERNAME, ADMINS
-import random
+from config import MODES, ADMINS
+from utils.validator import is_valid_message
 
+# Команда /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Привет! Я — ИИ-бот. Напиши что-нибудь!")
+    await update.message.reply_text("Привет! Я ИИ-бот. Просто напиши мне, или упомяни меня в чате.")
 
+# Команда /terms
 async def terms_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("❗ Используя этого бота, вы соглашаетесь с политикой конфиденциальности и условиями использования.")
+    await update.message.reply_text("💡 Условия использования: не вводите личную информацию. Ответы генерируются ИИ.")
 
-async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Ты нашёл секретный режим!")
-
-async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    random_mode_per_chat[chat_id] = True
-    await update.message.reply_text("🎲 Случайные ответы включены!")
-
-async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_id = update.effective_chat.id
-    random_mode_per_chat[chat_id] = False
-    await update.message.reply_text("🔕 Случайные ответы отключены!")
-
+# Команда /mode
 async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
+    if not message:
+        return
+
     chat_id = update.effective_chat.id
     user_id = update.effective_user.id
 
@@ -37,52 +34,132 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         new_mode = context.args[0].lower()
-        current_mode_per_chat[chat_id] = new_mode
-        await message.reply_text(f"✅ Режим установлен: *{new_mode}*", parse_mode="Markdown")
+        if new_mode in MODES:
+            current_mode_per_chat[chat_id] = new_mode
+            await message.reply_text(
+                f"✅ Режим для этого чата установлен на: *{new_mode}*",
+                parse_mode="Markdown"
+            )
+        else:
+            await message.reply_text(
+                f"❌ Режим *{new_mode}* не найден.\n"
+                f"Доступные: `{', '.join(MODES.keys())}`",
+                parse_mode="Markdown"
+            )
     else:
         current = current_mode_per_chat.get(chat_id, "default")
-        await message.reply_text(f"🧠 Текущий режим: *{current}*", parse_mode="Markdown")
+        await message.reply_text(
+            f"🧠 Текущий режим для этого чата: *{current}*\n"
+            f"Доступные: `{', '.join(MODES.keys())}`\n\n"
+            f"Чтобы изменить: `/mode режим`",
+            parse_mode="Markdown"
+        )
 
+# Команды /randomOn и /randomOff
+async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    random_mode_per_chat[chat_id] = True
+    await update.message.reply_text("✅ Случайные ответы включены.")
+
+async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = update.effective_chat.id
+    random_mode_per_chat[chat_id] = False
+    await update.message.reply_text("❌ Случайные ответы отключены.")
+
+# Пасхальная команда
+async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🔒 Поздравляю! Ты нашёл пасхалку 👀")
+
+# Обработка обычных сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
-    if not message or not message.text:
+    if not message or not is_valid_message(message.text):
+        logger.debug("Пустое сообщение или отсутствует текст — игнор.")
         return
 
+    text = message.text.strip()
     chat_id = update.effective_chat.id
     user = update.effective_user.username or update.effective_user.id
-    text = message.text.strip()
-
     logger.info(f"📩 Сообщение от @{user}: {text}")
 
-    mentioned = BOT_USERNAME.lower() in text.lower()
-    is_reply = message.reply_to_message and message.reply_to_message.from_user and message.reply_to_message.from_user.id == context.bot.id
     random_enabled = random_mode_per_chat.get(chat_id, True)
+    mentioned = BOT_USERNAME.lower() in text.lower()
+    is_reply = (
+        message.reply_to_message
+        and message.reply_to_message.from_user
+        and message.reply_to_message.from_user.id == context.bot.id
+    )
 
-    should_reply = mentioned or is_reply or (random_enabled and random.random() < 0.1)
-    if not should_reply:
+    if not (mentioned or is_reply or random_enabled):
+        logger.debug("⏩ Сообщение проигнорировано (нет упоминания, не реплай и рандом выкл).")
         return
 
-    prompt = text.replace(BOT_USERNAME, "").strip()
-    if not prompt:
-        await message.reply_text("❗ Пожалуйста, задай вопрос.")
-        return
+    should_reply = False
+    random_triggered = False
 
-    chat_history.setdefault(chat_id, []).append({"role": "user", "content": prompt})
-    chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+    if mentioned or is_reply:
+        should_reply = True
+        logger.info("🔁 Ответ из-за упоминания или реплая.")
+    elif random_enabled and random.random() < 0.1:
+        should_reply = True
+        random_triggered = True
+        logger.info("🎲 Ответ сработал по случайному триггеру (10%).")
 
-    try:
-        mode = current_mode_per_chat.get(chat_id, "default")
-        logger.info(f"🧠 Активный режим: {mode}")
-        reply = await ask_openai(chat_id, mode=mode)
-        reply = clean_ai_reply(reply)
+    if should_reply:
+        prompt = text.replace(BOT_USERNAME, "").strip()
 
-        if not reply or len(reply) > 1000:
-            await message.reply_text("⚠️ Ошибка генерации ответа.")
+        if not prompt:
+            if not random_triggered:
+                await message.reply_text("Пожалуйста, задайте вопрос.")
+                logger.info("❗ Получено только упоминание, без текста.")
             return
 
-        chat_history[chat_id].append({"role": "assistant", "content": reply})
+        if chat_id not in chat_history:
+            chat_history[chat_id] = []
+        logger.debug(f"Добавляется в историю: role=user, content={repr(prompt)}")
+        chat_history[chat_id].append({"role": "user", "content": prompt})
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
-        await message.reply_text(reply)
-    except Exception as e:
-        logger.error(f"Ошибка при генерации ответа: {e}")
-        await message.reply_text("Произошла ошибка при обращении к ИИ.")
+
+        try:
+            logger.info(f"➡️ Отправляем в Together: {prompt}")
+            mode = current_mode_per_chat.get(chat_id, "default")
+            logger.info(f"🧠 Активный режим: {mode} -> {MODES.get(mode, '❌ не найден')}")
+            reply = await ask_openai(chat_id, mode=mode)
+
+            reply = clean_ai_reply(reply)
+
+            if not reply or len(reply) > 1000:
+                logger.warning("⚠️ Ответ ИИ некорректный или слишком длинный.")
+                await message.reply_text("⚠️ Произошла ошибка генерации. Пожалуйста, переформулируйте вопрос.")
+                return
+
+            chat_history[chat_id].append({"role": "assistant", "content": reply})
+            chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
+            logger.debug("✅ Ответ ИИ добавлен в историю.")
+            await message.reply_text(reply)
+            logger.info(f"🤖 Ответ для @{user}: {reply}")
+
+        except Exception as e:
+            logger.error(f"❌ Ошибка при запросе: {e}")
+            await message.reply_text("Произошла ошибка при обращении к ИИ.")
+
+# Фильтр-очистка вложенных диалогов
+def clean_ai_reply(reply: str) -> str:
+    stop_phrases = [
+        r"^\s*(ИИ|user|assistant|пользователь):",
+        r"сейчас мне нужно ответить на вопрос",
+        r"вот пример",
+        r"пример кода",
+        r"код:",
+        r"1\.\s",
+    ]
+
+    lines = reply.splitlines()
+    cleaned = []
+
+    for line in lines:
+        if any(re.search(p, line.strip(), re.IGNORECASE) for p in stop_phrases):
+            break
+        cleaned.append(line)
+
+    return "\n".join(cleaned).strip()
