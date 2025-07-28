@@ -78,7 +78,7 @@ def is_valid_message(msg: dict) -> bool:
 # Асинхронный запрос с валидацией
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
     system_prompt = MODES.get(mode, MODES["default"])
-    base_model = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    base_model = "mistralai/Mistral-7B-Instruct-v0.2"
     max_chars = 4000  # ⛔️ Ограничение по длине prompt (в символах)
 
     # Получаем и валидируем историю
