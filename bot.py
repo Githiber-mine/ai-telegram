@@ -1,4 +1,5 @@
 import asyncio
+import nest_asyncio  # добавляем это
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -39,6 +40,8 @@ async def main():
 
 if __name__ == "__main__":
     try:
+        import nest_asyncio
+        nest_asyncio.apply()  # <--- нужно для Railway и других async-сред
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("🛑 Бот остановлен.")
