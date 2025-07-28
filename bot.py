@@ -93,6 +93,8 @@ ROLE_PROMPTS = {
 chat_history: Dict[int, list] = {}
 MAX_HISTORY = 6
 
+last_user_message_id_per_chat = {}
+
 # Валидация одного сообщения
 def is_valid_message(msg: dict) -> bool:
     content = msg.get("content", "")
