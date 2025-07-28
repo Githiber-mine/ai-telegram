@@ -12,4 +12,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")  # Пример: postgres://user:pass@h
 # Имя бота (можно задать вручную или вытянуть через Telegram API)
 BOT_USERNAME = os.getenv("BOT_USERNAME")
 
+from auth import load_admins
+ADMINS = load_admins()
+
 MAX_HISTORY = 10
