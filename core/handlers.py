@@ -4,11 +4,10 @@ import random
 import re
 from telegram import Update
 from telegram.ext import ContextTypes
-from config import BOT_USERNAME, MAX_HISTORY
+from config import BOT_USERNAME, MAX_HISTORY, MODES, ADMINS
 from services.ai import ask_openai
 from storage.memory import chat_history, current_mode_per_chat, random_mode_per_chat
 from utils.logger import logger
-from config import MODES, ADMINS
 from utils.validator import is_valid_message
 
 # Команда /start
