@@ -92,7 +92,6 @@ def is_valid_message(msg: dict) -> bool:
     )
 
 # Асинхронный запрос с валидацией
-# Асинхронный запрос с валидацией
 async def ask_openai(chat_id: int, mode: str = "default") -> str:
     system_prompt = MODES.get(mode, MODES["default"])
     base_model = "mistralai/Mistral-7B-Instruct-v0.2"
@@ -277,9 +276,10 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_mode = context.args[0].lower()
         if new_mode in MODES:
             current_mode_per_chat[chat_id] = new_mode
+            chat_history[chat_id] = []  # 🔥 Очистка истории при смене режима
             save_chat_settings()
             await message.reply_text(
-                f"✅ Режим для этого чата установлен на: *{new_mode}*",
+                f"✅ Режим для этого чата установлен на: *{new_mode}*.\n🧹 Контекст очищен.",
                 parse_mode="Markdown"
             )
         else:
@@ -297,7 +297,6 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Чтобы изменить: `/mode режим`",
             parse_mode="Markdown"
         )
-
 
 # 🔄 Включить случайные ответы
 async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
