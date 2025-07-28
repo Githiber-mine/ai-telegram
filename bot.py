@@ -21,7 +21,10 @@ from core.handlers import (
 
 async def main():
     logger.info("🚀 Запуск Telegram-бота...")
+
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+
+    await app.bot.delete_webhook(drop_pending_updates=True)
 
     # ✅ Регистрируем команды
     app.add_handler(CommandHandler("start", start_command))
