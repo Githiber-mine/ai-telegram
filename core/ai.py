@@ -21,7 +21,7 @@ prompt_parts = []
 for i, msg in enumerate(trimmed):
     role = msg.get("role")
     content = msg.get("content", "").strip()
-    name = msg.get("name", "Пользователь")  # имя, если задано
+    name = msg.get("name", "Пользователь")  # по умолчанию, если имени нет
 
     if role == "user":
         if i == len(trimmed) - 1:
@@ -35,8 +35,8 @@ for i, msg in enumerate(trimmed):
 prompt_parts.append("ИИ:")
 full_prompt = "\n".join(prompt_parts).strip()
 
-    if len(full_prompt) > MAX_CHARS:
-        full_prompt = full_prompt[-MAX_CHARS:]
+if len(full_prompt) > MAX_CHARS:
+    full_prompt = full_prompt[-MAX_CHARS:]
 
     try:
         response = client.completions.create(
