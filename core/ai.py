@@ -33,8 +33,7 @@ for i, msg in enumerate(trimmed):
         prompt_parts.append(f"ИИ: {content}")
 
 prompt_parts.append("ИИ:")
-
-    full_prompt = "\n".join(prompt_parts).strip()
+full_prompt = "\n".join(prompt_parts).strip()
 
     if len(full_prompt) > MAX_CHARS:
         full_prompt = full_prompt[-MAX_CHARS:]
