@@ -16,19 +16,15 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
     valid_history = [m for m in raw_history if is_valid_message(m.get("content"))]
     trimmed = valid_history[-MAX_HISTORY:]
 
-    prompt_parts = []
+    prompt_parts = [f"system: {system_prompt}"]
 
-    for i, msg in enumerate(trimmed):
+    for msg in trimmed:
         role = msg.get("role")
         content = msg.get("content", "").strip()
         name = msg.get("name", "Пользователь")
 
         if role == "user":
-            if i == len(trimmed) - 1:
-                styled_message = f"({system_prompt})\n{content}"
-                prompt_parts.append(f"{name}: {styled_message}")
-            else:
-                prompt_parts.append(f"{name}: {content}")
+            prompt_parts.append(f"{name}: {content}")
         elif role == "assistant":
             prompt_parts.append(f"ИИ: {content}")
 
@@ -49,4 +45,3 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
         return response.choices[0].text.strip()
     except Exception as e:
         return f"❌ Ошибка от Together: {str(e)}"
-
