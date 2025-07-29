@@ -16,27 +16,27 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
     valid_history = [m for m in raw_history if is_valid_message(m.get("content"))]
     trimmed = valid_history[-MAX_HISTORY:]
 
-prompt_parts = []
+    prompt_parts = []
 
-for i, msg in enumerate(trimmed):
-    role = msg.get("role")
-    content = msg.get("content", "").strip()
-    name = msg.get("name", "Пользователь")  # по умолчанию, если имени нет
+    for i, msg in enumerate(trimmed):
+        role = msg.get("role")
+        content = msg.get("content", "").strip()
+        name = msg.get("name", "Пользователь")
 
-    if role == "user":
-        if i == len(trimmed) - 1:
-            styled_message = f"({system_prompt})\n{content}"
-            prompt_parts.append(f"{name}: {styled_message}")
-        else:
-            prompt_parts.append(f"{name}: {content}")
-    elif role == "assistant":
-        prompt_parts.append(f"ИИ: {content}")
+        if role == "user":
+            if i == len(trimmed) - 1:
+                styled_message = f"({system_prompt})\n{content}"
+                prompt_parts.append(f"{name}: {styled_message}")
+            else:
+                prompt_parts.append(f"{name}: {content}")
+        elif role == "assistant":
+            prompt_parts.append(f"ИИ: {content}")
 
-prompt_parts.append("ИИ:")
-full_prompt = "\n".join(prompt_parts).strip()
+    prompt_parts.append("ИИ:")
+    full_prompt = "\n".join(prompt_parts).strip()
 
-if len(full_prompt) > MAX_CHARS:
-    full_prompt = full_prompt[-MAX_CHARS:]
+    if len(full_prompt) > MAX_CHARS:
+        full_prompt = full_prompt[-MAX_CHARS:]
 
     try:
         response = client.completions.create(
@@ -49,3 +49,4 @@ if len(full_prompt) > MAX_CHARS:
         return response.choices[0].text.strip()
     except Exception as e:
         return f"❌ Ошибка от Together: {str(e)}"
+
