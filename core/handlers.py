@@ -117,13 +117,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if chat_id not in chat_history:
             chat_history[chat_id] = []
 
-        name = update.effective_user.first_name or update.effective_user.username or "Пользователь"
-        logger.debug(f"Добавляется в историю: role=user, name={name}, content={repr(prompt)}")
+        # 👇 Добавляем имя только в группах
+        name = None
+        if update.effective_chat.type in ("group", "supergroup"):
+            name = update.effective_user.first_name or update.effective_user.username or "Пользователь"
 
+        logger.debug(f"Добавляется в историю: role=user, name={name}, content={repr(prompt)}")
         chat_history[chat_id].append({
             "role": "user",
             "content": prompt,
-            "name": name
+            **({"name": name} if name else {})
         })
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
@@ -140,7 +143,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await message.reply_text("⚠️ Произошла ошибка генерации. Пожалуйста, переформулируйте вопрос.")
                 return
 
-            chat_history[chat_id].append({"role": "assistant", "content": reply})
+            # ⛔ Не добавляем имя в ответ ИИ
+            chat_history[chat_id].append({
+                "role": "assistant",
+                "content": reply
+            })
             chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
             logger.debug("✅ Ответ ИИ добавлен в историю.")
             await message.reply_text(reply)
