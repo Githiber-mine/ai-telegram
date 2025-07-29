@@ -18,29 +18,22 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
 
     prompt_parts = []
 
-    for i, msg in enumerate(trimmed):
+    # Добавляем system prompt как инструкцию от имени "Система"
+    prompt_parts.append(f"Система: {system_prompt}")
+
+    for msg in trimmed:
         role = msg.get("role")
         content = msg.get("content", "").strip()
+        name = msg.get("name", "Пользователь")
 
-        # Получаем имя, только если есть и чат не приватный
-        name = msg.get("name", "Пользователь") if msg.get("role") == "user" else None
-        is_last_user_msg = (i == len(trimmed) - 1 and role == "user")
-
-        # Последнему сообщению пользователя добавляем system_prompt
-        if is_last_user_msg:
-            styled = f"({system_prompt})\n{content}"
-            line = f"{name}: {styled}" if name else styled
-            prompt_parts.append(line)
-        elif role == "user":
-            line = f"{name}: {content}" if name else content
-            prompt_parts.append(line)
+        if role == "user":
+            prompt_parts.append(f"{name}: {content}")
         elif role == "assistant":
             prompt_parts.append(f"ИИ: {content}")
 
     prompt_parts.append("ИИ:")
     full_prompt = "\n".join(prompt_parts).strip()
 
-    # Обрезаем если длинный
     if len(full_prompt) > MAX_CHARS:
         full_prompt = full_prompt[-MAX_CHARS:]
 
