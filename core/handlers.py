@@ -116,8 +116,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if chat_id not in chat_history:
             chat_history[chat_id] = []
-        logger.debug(f"Добавляется в историю: role=user, content={repr(prompt)}")
-        chat_history[chat_id].append({"role": "user", "content": prompt})
+
+        name = update.effective_user.first_name or update.effective_user.username or "Пользователь"
+        logger.debug(f"Добавляется в историю: role=user, name={name}, content={repr(prompt)}")
+
+        chat_history[chat_id].append({
+            "role": "user",
+            "content": prompt,
+            "name": name
+        })
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
         try:
