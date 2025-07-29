@@ -16,22 +16,23 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
     valid_history = [m for m in raw_history if is_valid_message(m.get("content"))]
     trimmed = valid_history[-MAX_HISTORY:]
 
-    prompt_parts = []
+prompt_parts = []
 
-    for i, msg in enumerate(trimmed):
-        role = msg.get("role")
-        content = msg.get("content", "").strip()
+for i, msg in enumerate(trimmed):
+    role = msg.get("role")
+    content = msg.get("content", "").strip()
+    name = msg.get("name", "Пользователь")  # имя, если задано
 
-        # Встраиваем стиль в последнее сообщение пользователя
-        if i == len(trimmed) - 1 and role == "user":
+    if role == "user":
+        if i == len(trimmed) - 1:
             styled_message = f"({system_prompt})\n{content}"
-            prompt_parts.append(f"Пользователь: {styled_message}")
-        elif role == "user":
-            prompt_parts.append(f"Пользователь: {content}")
-        elif role == "assistant":
-            prompt_parts.append(f"ИИ: {content}")
+            prompt_parts.append(f"{name}: {styled_message}")
+        else:
+            prompt_parts.append(f"{name}: {content}")
+    elif role == "assistant":
+        prompt_parts.append(f"ИИ: {content}")
 
-    prompt_parts.append("ИИ:")
+prompt_parts.append("ИИ:")
 
     full_prompt = "\n".join(prompt_parts).strip()
 
