@@ -18,17 +18,17 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
 
     messages = [{"role": "system", "content": system_prompt}]
 
-for msg in trimmed:
-    role = msg.get("role")
-    content = msg.get("content", "").strip()
-    if not content:
-        continue  # Пропускаем пустое сообщение
-    name = msg.get("name", "Пользователь")
+    for msg in trimmed:
+        role = msg.get("role")
+        content = msg.get("content", "").strip()
+        if not content:
+            continue  # Пропускаем пустое сообщение
+        name = msg.get("name", "Пользователь")
 
-    if role == "user":
-        messages.append({"role": "user", "content": f"{name}: {content}"})
-    elif role == "assistant":
-        messages.append({"role": "assistant", "content": content})
+        if role == "user":
+            messages.append({"role": "user", "content": f"{name}: {content}"})
+        elif role == "assistant":
+            messages.append({"role": "assistant", "content": content})
 
     try:
         response = client.chat.completions.create(
