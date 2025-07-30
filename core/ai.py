@@ -16,10 +16,7 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
     valid_history = [m for m in raw_history if is_valid_message(m.get("content"))]
     trimmed = valid_history[-MAX_HISTORY:]
 
-    prompt_parts = []
-
-    # Добавляем system prompt как инструкцию от имени "Система"
-    prompt_parts.append(f"Система: {system_prompt}")
+    messages = [{"role": "system", "content": system_prompt}]
 
     for msg in trimmed:
         role = msg.get("role")
@@ -27,24 +24,19 @@ async def ask_openai(chat_id: int, mode: str = "default") -> str:
         name = msg.get("name", "Пользователь")
 
         if role == "user":
-            prompt_parts.append(f"{name}: {content}")
+            # Имя вставляется в текст пользователя
+            messages.append({"role": "user", "content": f"{name}: {content}"})
         elif role == "assistant":
-            prompt_parts.append(f"ИИ: {content}")
-
-    prompt_parts.append("ИИ:")
-    full_prompt = "\n".join(prompt_parts).strip()
-
-    if len(full_prompt) > MAX_CHARS:
-        full_prompt = full_prompt[-MAX_CHARS:]
+            messages.append({"role": "assistant", "content": content})
 
     try:
-        response = client.completions.create(
+        response = client.chat.completions.create(
             model=BASE_MODEL,
-            prompt=full_prompt,
+            messages=messages,
             temperature=0.7,
             top_p=0.95,
             max_tokens=512
         )
-        return response.choices[0].text.strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         return f"❌ Ошибка от Together: {str(e)}"
