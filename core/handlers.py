@@ -36,8 +36,10 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         new_mode = context.args[0].lower()
         if new_mode in MODES:
             current_mode_per_chat[chat_id] = new_mode
+            chat_history[chat_id] = []  # ⬅️ ОЧИСТКА истории при смене режима
             await message.reply_text(
-                f"✅ Режим для этого чата установлен на: *{new_mode}*",
+                f"✅ Режим для этого чата установлен на: *{new_mode}*\n"
+                f"🧹 История чата была очищена.",
                 parse_mode="Markdown"
             )
         else:
