@@ -9,7 +9,7 @@ from telegram.ext import (
 from config import TELEGRAM_TOKEN
 from utils.logger import logger
 from utils.notify_admin import notify_admin
-from database import init_db, load_chat_settings
+from db.database import init_db, load_chat_settings
 from core.handlers import (
     start_command,
     terms_command,
