@@ -9,6 +9,7 @@ from telegram.ext import (
 from config import TELEGRAM_TOKEN
 from utils.logger import logger
 from utils.notify_admin import notify_admin
+from database import init_db, load_chat_settings
 from core.handlers import (
     start_command,
     terms_command,
@@ -36,6 +37,8 @@ async def main():
 
     # 📨 Обработка всех остальных текстовых сообщений
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    await init_db()
+    await load_chat_settings()
 
     await notify_admin(app.bot, "🤖 Бот запущен и готов к работе!")
 
