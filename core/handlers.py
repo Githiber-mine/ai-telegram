@@ -10,7 +10,7 @@ from core.ai import ask_openai
 from utils.history import chat_history, current_mode_per_chat, random_mode_per_chat
 from utils.logger import logger
 from utils.validator import is_valid_message
-from database import save_chat_setting
+from db.database import save_chat_setting
 
 # Команда /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
