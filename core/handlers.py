@@ -10,6 +10,7 @@ from core.ai import ask_openai
 from utils.history import chat_history, current_mode_per_chat, random_mode_per_chat
 from utils.logger import logger
 from utils.validator import is_valid_message
+from database import save_chat_setting
 
 # Команда /start
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -37,6 +38,7 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if new_mode in MODES:
             current_mode_per_chat[chat_id] = new_mode
             chat_history[chat_id] = []  # ⬅️ ОЧИСТКА истории при смене режима
+            await save_chat_setting(chat_id)
             await message.reply_text(
                 f"✅ Режим для этого чата установлен на: *{new_mode}*\n"
                 f"🧹 История чата была очищена.",
@@ -61,11 +63,13 @@ async def mode_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def enable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = True
+    await save_chat_setting(chat_id)
     await update.message.reply_text("✅ Случайные ответы включены.")
 
 async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     random_mode_per_chat[chat_id] = False
+    await save_chat_setting(chat_id)
     await update.message.reply_text("❌ Случайные ответы отключены.")
 
 # Пасхальная команда
