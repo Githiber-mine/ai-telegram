@@ -136,6 +136,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         })
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
+        # 🔽 Ограничение по количеству слов
+        MAX_WORDS_PER_MESSAGE = 150
+        MAX_TOTAL_WORDS = 1500
+
+        def total_words(messages):
+            return sum(len(m.get("content", "").split()) for m in messages)
+
+        # Удаляем старые сообщения, если отдельные слишком длинные или история слишком объёмная
+        while chat_history[chat_id] and (
+            any(len(m.get("content", "").split()) > MAX_WORDS_PER_MESSAGE for m in chat_history[chat_id])
+            or total_words(chat_history[chat_id]) > MAX_TOTAL_WORDS
+        ):
+            removed = chat_history[chat_id].pop(0)
+            logger.debug(f"🧹 Удалено сообщение из истории из-за длины: {removed}")
+
         try:
             logger.info(f"➡️ Отправляем в Together: {prompt}")
             mode = current_mode_per_chat.get(chat_id, "default")
