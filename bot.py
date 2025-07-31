@@ -34,6 +34,7 @@ async def main():
     app.add_handler(CommandHandler("randomon", enable_random))
     app.add_handler(CommandHandler("randomoff", disable_random))
     app.add_handler(CommandHandler("secret", secret_command))
+    app.add_handler(CommandHandler("say", say_command))
 
     # 📨 Обработка всех остальных текстовых сообщений
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
