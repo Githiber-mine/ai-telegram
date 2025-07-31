@@ -76,6 +76,51 @@ async def disable_random(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def secret_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔒 Поздравляю! Ты нашёл пасхалку 👀")
 
+#команда /say
+async def say_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # Проверка: только в личке
+    if update.effective_chat.type != "private":
+        return
+
+    user_id = update.effective_user.id
+    if user_id not in ADMINS:
+        await update.message.reply_text("🚫 Только админы могут использовать эту команду.")
+        return
+
+    if len(context.args) < 2:
+        await update.message.reply_text(
+            "❗ Использование:\n"
+            "/say <chat_id> <текст>\n"
+            "/say <chat_id> <message_id> <текст>"
+        )
+        return
+
+    try:
+        target_chat_id = int(context.args[0])
+
+        # Если второй аргумент — число, значит это message_id
+        if context.args[1].isdigit():
+            target_message_id = int(context.args[1])
+            text = " ".join(context.args[2:])
+            await context.bot.send_message(
+                chat_id=target_chat_id,
+                text=text,
+                reply_to_message_id=target_message_id,
+                allow_sending_without_reply=True
+            )
+        else:
+            text = " ".join(context.args[1:])
+            await context.bot.send_message(
+                chat_id=target_chat_id,
+                text=text
+            )
+
+        await update.message.reply_text("✅ Сообщение отправлено.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {e}")
+
+
+
 # Обработка обычных сообщений
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
