@@ -18,6 +18,7 @@ from core.handlers import (
     disable_random,
     secret_command,
     handle_message,
+    say_command,
 )
 
 async def main():
