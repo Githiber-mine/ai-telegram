@@ -137,8 +137,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_history[chat_id] = chat_history[chat_id][-MAX_HISTORY:]
 
         # 🔽 Ограничение по количеству слов
-        MAX_WORDS_PER_MESSAGE = 150
-        MAX_TOTAL_WORDS = 1500
+        MAX_WORDS_PER_MESSAGE = 75
+        MAX_TOTAL_WORDS = 450
 
         def total_words(messages):
             return sum(len(m.get("content", "").split()) for m in messages)
