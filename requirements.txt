@@ -2,3 +2,4 @@ python-telegram-bot==20.8
 nest_asyncio>=1.5
 asyncpg
 together
+python-dotenv
